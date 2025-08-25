@@ -5,14 +5,16 @@ export type Zone = {
     priority: number,
     sdf?: (x: number, y: number) => number,  // negative for inside
     cursor?: string,
-    paint?: (arg: { hovered: boolean }) => void,
+    paint?: (args: { hovered: boolean }) => void,
     on_left_mouse_down?: (args: { x: number, y: number }) => void,
+    on_hover?: (args: { x: number, y: number, event: MouseEvent }) => void,
 };
 
 export type UiFn = (args: { canvas: HTMLCanvasElement }) => Zone[];
 
 type RezProps = {
     ui_fn: UiFn,
+    on_unhover?: () => void,
 } & React.ComponentPropsWithoutRef<"canvas">;
 
 type Size = {
@@ -25,7 +27,7 @@ type Size = {
 
 export function Rez(props: RezProps) {
     console.log("<Rez>");
-    let { ui_fn, ...canvas_props } = props;
+    let { ui_fn, on_unhover, ...canvas_props } = props;
     let canvas_ref = useRef<HTMLCanvasElement>(null);
 
     let [size, set_size] = useState<Size>(() => ({
@@ -37,6 +39,7 @@ export function Rez(props: RezProps) {
     }));
 
     let [mouse_pos, set_mouse_pos] = useState<{ x: number, y: number } | null>(null);
+    let [mouse_event, set_mouse_event] = useState<MouseEvent | null>(null);
 
     let scale_mouse_coords = useCallback((e: MouseEvent) => {
         let canvas = bang(canvas_ref.current);
@@ -131,13 +134,25 @@ export function Rez(props: RezProps) {
         }
     }, [zones, hovered_zone, size]);
 
+    useEffect(() => {
+        if (size.width_pixels === 0) return;
+        let h = hovered_zone?.on_hover;
+        if (h && mouse_pos && mouse_event) {
+            h({ x: mouse_pos.x, y: mouse_pos.y, event: mouse_event });
+        } else {
+            on_unhover?.();
+        }
+    }, [zones, hovered_zone, size, mouse_event, mouse_pos, on_unhover]);
+
     function on_mouse_move(e: React.PointerEvent) {
         let p = scale_mouse_coords(e.nativeEvent);
         set_mouse_pos(p);
+        set_mouse_event(e.nativeEvent);
     }
 
     function on_mouse_leave() {
         set_mouse_pos(null);
+        set_mouse_event(null);
     }
 
     function on_pointer_down(e: React.PointerEvent) {
@@ -153,9 +168,12 @@ export function Rez(props: RezProps) {
         canvas.releasePointerCapture(e.nativeEvent.pointerId);
     }
 
+    let updated_props = { ... canvas_props};
+    updated_props.style = { ... updated_props.style, cursor: hovered_zone?.cursor || "default" };
+
     return <canvas
         ref={canvas_ref}
-        {...canvas_props}
+        {...updated_props}
         onPointerMove={on_mouse_move}
         onPointerLeave={on_mouse_leave}
         onPointerDown={on_pointer_down}
