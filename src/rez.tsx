@@ -10,7 +10,7 @@ export type Zone = {
     on_hover?: (args: { x: number, y: number, event: MouseEvent }) => void,
 };
 
-export type UiFn = (args: { canvas: HTMLCanvasElement }) => Zone[];
+export type UiFn = (args: { canvas: HTMLCanvasElement, width: number, height: number }) => Zone[];
 
 type RezProps = {
     ui_fn: UiFn,
@@ -97,7 +97,7 @@ export function Rez(props: RezProps) {
         if (size.width_pixels === 0) return [];
         console.log("recompute zones");
         let canvas = bang(canvas_ref.current);
-        return ui_fn({canvas}).sort((a, b) => b.priority - a.priority);
+        return ui_fn({canvas, width: size.width, height: size.height}).sort((a, b) => b.priority - a.priority);
     }, [ui_fn, size]);
 
     let hovered_zone: Zone | null = useMemo<Zone | null>(() => {
