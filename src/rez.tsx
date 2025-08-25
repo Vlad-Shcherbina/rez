@@ -7,6 +7,7 @@ export type Zone = {
     cursor?: string,
     paint?: (args: { hovered: boolean }) => void,
     on_left_mouse_down?: (args: { x: number, y: number }) => void,
+    on_left_mouse_up?: (args: { x: number, y: number }) => void,
     on_hover?: (args: { x: number, y: number, event: MouseEvent }) => void,
 };
 
@@ -97,7 +98,7 @@ export function Rez(props: RezProps) {
         if (size.width_pixels === 0) return [];
         console.log("recompute zones");
         let canvas = bang(canvas_ref.current);
-        return ui_fn({canvas, width: size.width, height: size.height}).sort((a, b) => b.priority - a.priority);
+        return ui_fn({canvas, width: size.width, height: size.height}).sort((a, b) => a.priority - b.priority);
     }, [ui_fn, size]);
 
     let hovered_zone: Zone | null = useMemo<Zone | null>(() => {
@@ -127,6 +128,7 @@ export function Rez(props: RezProps) {
         canvas.height = size.height_pixels;
 
         let ctx = bang(canvas.getContext("2d"));
+        ctx.setTransform(1, 0, 0, 1, 0, 0);
         ctx.scale(size.dpr, size.dpr);
 
         for (let z of zones) {
@@ -166,6 +168,9 @@ export function Rez(props: RezProps) {
     function on_pointer_up(e: React.PointerEvent) {
         let canvas = bang(canvas_ref.current);
         canvas.releasePointerCapture(e.nativeEvent.pointerId);
+        if (e.button === 0) {
+            hovered_zone?.on_left_mouse_up?.(bang(mouse_pos));
+        }
     }
 
     let updated_props = { ... canvas_props};
