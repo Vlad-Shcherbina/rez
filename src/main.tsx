@@ -34,7 +34,7 @@ function App() {
                 sdf: () => -1,
                 cursor: "grabbing",
                 on_hover({x, y}) {
-                    set_drag(d => d === null || d.cur_x === x || d.cur_y === y ? d : { ...d, cur_x: x, cur_y: y });
+                    set_drag(d => d === null || (d.cur_x === x && d.cur_y === y) ? d : { ...d, cur_x: x, cur_y: y });
                 },
                 on_left_mouse_up({x, y}) {
                     set_drag(null);
