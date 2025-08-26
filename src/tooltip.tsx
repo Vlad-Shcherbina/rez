@@ -19,13 +19,14 @@ export function useTooltip() {
         `;
         document.body.appendChild(el);
         div_ref.current = el;
-        root_ref.current = createRoot(el);
+        let root = root_ref.current = createRoot(el);
 
-        return () => {
-            bang(root_ref.current).unmount();
-            let el = bang(div_ref.current);
+        // Without a microtask, <StrictMode> produces a warning:
+        // "Attempted to synchronously unmount a root while React was already rendering."
+        return () => queueMicrotask(() => {
+            root.unmount();
             bang(el.parentNode).removeChild(el);
-        };
+        });
     }, []);
 
     let set_tooltip = useCallback((content: ReactNode, e: MouseEvent) => {

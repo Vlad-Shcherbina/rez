@@ -4,7 +4,7 @@ import { createRoot } from "react-dom/client";
 import { Rez, UiFn, Zone } from "./rez";
 import { make_circle_sdf } from "./sdfs";
 import { useTooltip } from "./tooltip";
-import { useState } from "react";
+import { StrictMode, useState } from "react";
 
 function App() {
     console.log("<App>");
@@ -87,4 +87,4 @@ function App() {
 }
 
 let root = bang(document.getElementById("root"));
-createRoot(root).render(<App />);
+createRoot(root).render(<StrictMode><App /></StrictMode>);
