@@ -7,17 +7,18 @@ import { useTooltip } from "./tooltip";
 import { StrictMode, useState } from "react";
 
 type HoverDetail = {
-    type: "dragging",
     x: number,
     y: number,
 };
 
 function App() {
-    console.log("<App>");
+    // console.log("<App>");
     let { set_tooltip, clear_tooltip } = useTooltip();
     let [counter, set_counter] = useState(0);
     let [points, set_points] = useState<[number, number][]>([[10, 20]]);
-    let [drag, set_drag] = useState<null | { start_x: number, start_y: number, cur_x: number, cur_y: number }>(null);
+    let [drag, set_drag] = useState<null | { start_x: number, start_y: number }>(null);
+    let [cross, set_cross_naive] = useState<[number, number]>([0, 0]);
+    let set_cross = (nx: number, ny: number) => set_cross_naive((old) => old[0] != nx || old[1] != ny ? [nx, ny] : old);
 
     let ui_fn: UiFn<HoverDetail> = ({ canvas, width, height }) => {
         let ctx = bang(canvas.getContext("2d"));
@@ -28,18 +29,21 @@ function App() {
                 ctx.fillStyle = "black";
                 ctx.font = "12px sans-serif";
                 ctx.fillText('hover detail: ' + JSON.stringify(hover_detail), 10, 20);
+
+                ctx.strokeStyle = "black";
+                ctx.strokeRect(cross[0], cross[1], 10, 10);
             },
         })
         zones.push({
             priority: -1000,
             sdf: () => -1,
-            paint() {
-                if (drag) {
-                    ctx.translate(drag.cur_x - drag.start_x, drag.cur_y - drag.start_y);
+            paint({ hover_detail }) {
+                if (drag && hover_detail ) {
+                    ctx.translate(hover_detail.x - drag.start_x, hover_detail.y - drag.start_y);
                 }
             },
             on_left_mouse_down({x, y}) {
-                set_drag({ start_x: x, start_y: y, cur_x: x, cur_y: y });
+                set_drag({ start_x: x, start_y: y });
             }
         });
         if (drag) {
@@ -47,8 +51,9 @@ function App() {
                 priority: 1000,
                 sdf: () => -1,
                 cursor: "grabbing",
-                on_hover({x, y}) {
-                    set_drag(d => d === null || (d.cur_x === x && d.cur_y === y) ? d : { ...d, cur_x: x, cur_y: y });
+                get_hover_detail(x, y) {
+                    set_cross(x, y);
+                    return [`${x},${y}`, {x, y}];
                 },
                 on_left_mouse_up({x, y}) {
                     set_drag(null);
@@ -63,9 +68,6 @@ function App() {
                 cursor: "crosshair",
                 on_hover({event}) {
                     set_tooltip("Circle", event);
-                },
-                get_hover_detail(x, y) {
-                    return ["dragging" + x + y, {type: "dragging", x, y}];
                 },
                 paint({hovered}) {
                     ctx.fillStyle = "red";
@@ -104,4 +106,5 @@ function App() {
 }
 
 let root = bang(document.getElementById("root"));
-createRoot(root).render(<StrictMode><App /></StrictMode>);
+// createRoot(root).render(<StrictMode><App /></StrictMode>);
+createRoot(root).render(<App />);
