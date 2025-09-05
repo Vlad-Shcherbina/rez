@@ -6,6 +6,12 @@ import { make_circle_sdf } from "./sdfs";
 import { useTooltip } from "./tooltip";
 import { StrictMode, useState } from "react";
 
+type HoverDetail = {
+    type: "dragging",
+    x: number,
+    y: number,
+};
+
 function App() {
     console.log("<App>");
     let { set_tooltip, clear_tooltip } = useTooltip();
@@ -13,9 +19,17 @@ function App() {
     let [points, set_points] = useState<[number, number][]>([[10, 20]]);
     let [drag, set_drag] = useState<null | { start_x: number, start_y: number, cur_x: number, cur_y: number }>(null);
 
-    let ui_fn: UiFn = ({ canvas, width, height }) => {
+    let ui_fn: UiFn<HoverDetail> = ({ canvas, width, height }) => {
         let ctx = bang(canvas.getContext("2d"));
-        let zones: Zone[] = [];
+        let zones: Zone<HoverDetail>[] = [];
+        zones.push({
+            priority: -2000,
+            paint({ hover_detail }) {
+                ctx.fillStyle = "black";
+                ctx.font = "12px sans-serif";
+                ctx.fillText('hover detail: ' + JSON.stringify(hover_detail), 10, 20);
+            },
+        })
         zones.push({
             priority: -1000,
             sdf: () => -1,
@@ -49,6 +63,9 @@ function App() {
                 cursor: "crosshair",
                 on_hover({event}) {
                     set_tooltip("Circle", event);
+                },
+                get_hover_detail(x, y) {
+                    return ["dragging" + x + y, {type: "dragging", x, y}];
                 },
                 paint({hovered}) {
                     ctx.fillStyle = "red";

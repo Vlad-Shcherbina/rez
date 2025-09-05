@@ -1,20 +1,21 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { bang } from "./assert";
 
-export type Zone = {
+export type Zone<HoverDetail> = {
     priority: number,
     sdf?: (x: number, y: number) => number,  // negative for inside
     cursor?: string,
-    paint?: (args: { hovered: boolean }) => void,
+    paint?: (args: { hovered: boolean, hover_detail: HoverDetail | null }) => void,
     on_left_mouse_down?: (args: { x: number, y: number }) => void,
     on_left_mouse_up?: (args: { x: number, y: number }) => void,
     on_hover?: (args: { x: number, y: number, event: MouseEvent }) => void,
+    get_hover_detail?: (x: number, y: number) => [string | null, HoverDetail | null],
 };
 
-export type UiFn = (args: { canvas: HTMLCanvasElement, width: number, height: number }) => Zone[];
+export type UiFn<HoverDetail> = (args: { canvas: HTMLCanvasElement, width: number, height: number }) => Zone<HoverDetail>[];
 
-type RezProps = {
-    ui_fn: UiFn,
+type RezProps<HoverDetail> = {
+    ui_fn: UiFn<HoverDetail>,
     on_unhover?: () => void,
 } & React.ComponentPropsWithoutRef<"canvas">;
 
@@ -26,7 +27,8 @@ type Size = {
     height: number,
 };
 
-export function Rez(props: RezProps) {
+export function Rez<HoverDetail>(props: RezProps<HoverDetail>) {
+
     console.log("<Rez>");
     let { ui_fn, on_unhover, ...canvas_props } = props;
     let canvas_ref = useRef<HTMLCanvasElement>(null);
@@ -41,6 +43,8 @@ export function Rez(props: RezProps) {
 
     let [mouse_pos, set_mouse_pos] = useState<{ x: number, y: number } | null>(null);
     let [mouse_event, set_mouse_event] = useState<MouseEvent | null>(null);
+
+    let [hover_detail, set_hover_detail] = useState<[string | null, HoverDetail | null]>([null, null]);
 
     let scale_mouse_coords = useCallback((e: MouseEvent) => {
         let canvas = bang(canvas_ref.current);
@@ -101,9 +105,9 @@ export function Rez(props: RezProps) {
         return ui_fn({canvas, width: size.width, height: size.height}).sort((a, b) => a.priority - b.priority);
     }, [ui_fn, size]);
 
-    let hovered_zone: Zone | null = useMemo<Zone | null>(() => {
+    let hovered_zone: Zone<HoverDetail> | null = useMemo<Zone<HoverDetail> | null>(() => {
         if (!mouse_pos) return null;
-        let best: Zone | null = null;
+        let best: Zone<HoverDetail> | null = null;
         let priority = 0;
         let dist = 0;
         for (let zone of zones) {
@@ -132,9 +136,9 @@ export function Rez(props: RezProps) {
         ctx.scale(size.dpr, size.dpr);
 
         for (let z of zones) {
-            z.paint?.({ hovered: z === hovered_zone });
+            z.paint?.({ hovered: z === hovered_zone, hover_detail: hover_detail[1] });
         }
-    }, [zones, hovered_zone, size]);
+    }, [zones, hovered_zone, size, hover_detail]);
 
     useEffect(() => {
         if (size.width_pixels === 0) return;
@@ -144,6 +148,12 @@ export function Rez(props: RezProps) {
         } else {
             on_unhover?.();
         }
+        let ghd = hovered_zone?.get_hover_detail;
+        let new_hd: [string | null, HoverDetail | null] = [null, null];
+        if (ghd && mouse_pos) {
+            new_hd = ghd(mouse_pos.x, mouse_pos.y);
+        }
+        set_hover_detail(hd => hd[0] === new_hd[0] ? hd : new_hd);
     }, [zones, hovered_zone, size, mouse_event, mouse_pos, on_unhover]);
 
     function on_mouse_move(e: React.PointerEvent) {
