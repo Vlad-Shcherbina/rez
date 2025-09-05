@@ -17,6 +17,7 @@ export type UiFn<HoverDetail> = (args: { canvas: HTMLCanvasElement, width: numbe
 type RezProps<HoverDetail> = {
     ui_fn: UiFn<HoverDetail>,
     on_unhover?: () => void,
+    logging?: boolean,
 } & React.ComponentPropsWithoutRef<"canvas">;
 
 type Size = {
@@ -29,8 +30,8 @@ type Size = {
 
 export function Rez<HoverDetail>(props: RezProps<HoverDetail>) {
 
-    console.log("<Rez>");
-    let { ui_fn, on_unhover, ...canvas_props } = props;
+    let { ui_fn, on_unhover, logging, ...canvas_props } = props;
+    if (logging) console.log("<Rez>");
     let canvas_ref = useRef<HTMLCanvasElement>(null);
 
     let [size, set_size] = useState<Size>(() => ({
@@ -56,12 +57,12 @@ export function Rez<HoverDetail>(props: RezProps<HoverDetail>) {
     }, [size]);
 
     useEffect(() => {
-        console.log("create rez");
+        if (logging) console.log("create rez");
         let canvas = bang(canvas_ref.current);
         // https://webglfundamentals.org/webgl/lessons/webgl-resizing-the-canvas.html
         const obs = new ResizeObserver((entries) => {
-            console.log("on resize");
-            console.log(entries.length);
+            if (logging) console.log("on resize");
+            if (logging) console.log(entries.length);
             for (const entry of entries) {
                 let dpr = window.devicePixelRatio;
                 let width_pixels;
@@ -96,14 +97,14 @@ export function Rez<HoverDetail>(props: RezProps<HoverDetail>) {
         return () => {
             obs.disconnect();
         };
-    }, []);
+    }, [logging]);
 
     let zones = useMemo(() => {
         if (size.width_pixels === 0) return [];
-        console.log("recompute zones");
+        if (logging) console.log("recompute zones");
         let canvas = bang(canvas_ref.current);
         return ui_fn({canvas, width: size.width, height: size.height}).sort((a, b) => a.priority - b.priority);
-    }, [ui_fn, size]);
+    }, [ui_fn, size, logging]);
 
     let hovered_zone: Zone<HoverDetail> | null = useMemo<Zone<HoverDetail> | null>(() => {
         if (!mouse_pos) return null;
@@ -126,7 +127,7 @@ export function Rez<HoverDetail>(props: RezProps<HoverDetail>) {
 
     useEffect(() => {
         if (size.width_pixels === 0) return;
-        console.log("repaint");
+        if (logging) console.log("repaint");
         let canvas = bang(canvas_ref.current);
         canvas.width = size.width_pixels;
         canvas.height = size.height_pixels;
@@ -138,7 +139,7 @@ export function Rez<HoverDetail>(props: RezProps<HoverDetail>) {
         for (let z of zones) {
             z.paint?.({ hovered: z === hovered_zone, hover_detail: hover_detail[1] });
         }
-    }, [zones, hovered_zone, size, hover_detail]);
+    }, [zones, hovered_zone, size, hover_detail, logging]);
 
     useEffect(() => {
         if (size.width_pixels === 0) return;
