@@ -64,6 +64,34 @@ function App() {
             })
         });
 
+        let x = 250;
+        let y = 250;
+        let r = 30;
+        let z: Zone = {
+            priority: 0,
+            sdf: make_circle_sdf(x, y, r),
+            paint: () => {
+                ctx.fillStyle = "gray";
+                ctx.beginPath();
+                ctx.arc(x, y, r, 0, Math.PI * 2);
+                ctx.fill();
+            },
+            on_hover: ({event}) => {
+                set_tooltip(<>Hover indicator is in a separate zone</>, event);
+            },
+        };
+        zones.push(z);
+        zones.push({
+            priority: 10,
+            paint: ({ hovered_zone }) => {
+                if (hovered_zone !== z) return;
+                ctx.strokeStyle = "black";
+                ctx.beginPath();
+                ctx.arc(x, y, r, 0, Math.PI * 2);
+                ctx.stroke();
+            }
+        });
+
         return zones;
     }
     rez.ui_fn = ui_fn;

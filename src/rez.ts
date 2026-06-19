@@ -4,7 +4,7 @@ export type Zone = {
     priority: number,
     sdf?: (x: number, y: number) => number,  // negative for inside
     cursor?: string,
-    paint?: (args: { hovered: boolean }) => void,
+    paint?: (args: { hovered: boolean, hovered_zone: Zone | null }) => void,
     on_left_mouse_down?: (args: { x: number, y: number }) => void,
     on_left_mouse_up?: (args: { x: number, y: number }) => void,
 
@@ -292,7 +292,7 @@ export class Rez {
         ctx.scale(this.dpr, this.dpr);
 
         for (let z of zones) {
-            z.paint?.({ hovered: z === hovered_zone });
+            z.paint?.({ hovered: z === hovered_zone, hovered_zone });
         }
         if (this.log) console.timeEnd("rez.paint()");
     }
