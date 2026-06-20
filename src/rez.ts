@@ -95,7 +95,7 @@ export class Rez {
         }
 
         let obs = new ResizeObserver((entries) => {
-            console.log("resize obs");
+            if (this.log) console.log("resize obs");
             for (let entry of entries) {
                 let dpr = window.devicePixelRatio;
                 let width_pixels;
@@ -118,6 +118,7 @@ export class Rez {
                 this.height_pixels = height_pixels;
                 this.width = width;
                 this.height = height;
+                if (this.log) console.log("resize obs", { dpr, width_pixels, height_pixels, width, height });
 
                 this.request_repaint();
             }
