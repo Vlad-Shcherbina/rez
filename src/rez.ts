@@ -128,11 +128,22 @@ export class Rez {
                 this.height_pixels = height_pixels;
                 this.width = width;
                 this.height = height;
+
+                // Set the canvas resolution here, not in paint(), so that ui_fn() always
+                // observes the correct canvas.width/height. ui_fn() can run before the first
+                // paint(), e.g. from the pointermove handler (see anchor: R0OI8LKK).
+                c.width = width_pixels;
+                c.height = height_pixels;
+
                 if (this.log) console.log("resize obs", { dpr, width_pixels, height_pixels, width, height });
 
                 this.zones = NOT_COMPUTED;
                 this.hovered_zone = NOT_COMPUTED;
-                this.request_repaint();
+
+                // Paint synchronously here rather than in rAF to avoid flicker,
+                // because we just changed canvas resolution and cleared it.
+                this.repaint_needed = true;
+                this.paint();
             }
         });
 
@@ -184,9 +195,8 @@ export class Rez {
 
         // anchor: R0OI8LKK
         // We don't request repaint here, because rAF fires before ResizeObserver, so we'd be painting with wrong resolution.
-        // Instead, we only request repaint from ResizeObserver.
+        // Instead, we paint from the ResizeObserver callback, which runs after layout with the accurate resolution.
         // ResizeObserver is guaranteed to trigger once after we started observing the element, so this works for initialization.
-        // Paint is delayed by one frame, but it seems there is no way around it if we want to use accurate resolution from ResizeObserver.
     }
 
     private clear_mouse_pos() {
@@ -277,7 +287,7 @@ export class Rez {
         this.repaint_needed = true;
 
         if (this.width === 0) {
-            // We don't schedule repaint right away, and instead rely on ReziseObserver to schedule it (see anchor: R0OI8LKK)
+            // We don't schedule repaint right away, and instead rely on ResizeObserver to repaint (see anchor: R0OI8LKK)
             return;
         }
 
@@ -299,10 +309,9 @@ export class Rez {
         if (this.log) console.time("rez.paint()");
         let canvas = this.#canvas;
         assert(this.width > 0);
-        canvas.width = this.width_pixels;
-        canvas.height = this.height_pixels;
         let ctx = bang(canvas.getContext("2d"));
         ctx.setTransform(1, 0, 0, 1, 0, 0);
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
         ctx.scale(this.dpr, this.dpr);
 
         for (let z of zones) {

@@ -17,9 +17,7 @@ function App() {
     let { set_tooltip, clear_tooltip } = useTooltip();
 
     let ui_fn: UiFn = ({canvas, width, height}) => {
-        // TODO: First invocation of ui_fn happens before canvas changed resolution.
-        // This is probably a bug. First paint happens with the right resolution.
-        // assert(canvas.width % 400 === 0, `${canvas.width} ${canvas.height}`); // % to allow for DPI factor
+        assert(canvas.width % 400 === 0, `${canvas.width} ${canvas.height}`); // % to allow for DPI factor
 
         let zones: Zone[] = [];
         let ctx = bang(canvas.getContext("2d"));
