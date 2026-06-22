@@ -130,6 +130,8 @@ export class Rez {
                 this.height = height;
                 if (this.log) console.log("resize obs", { dpr, width_pixels, height_pixels, width, height });
 
+                this.zones = NOT_COMPUTED;
+                this.hovered_zone = NOT_COMPUTED;
                 this.request_repaint();
             }
         });

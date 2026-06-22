@@ -101,7 +101,7 @@ function App() {
         return zones;
     }
 
-    // Maybe pass ui_fn and on_hover to useRez and move the effect there?
+    // Maybe pass ui_fn and on_hover to useRez and move the effect there? (anchor: VhPJQYue)
     useLayoutEffect(() => {
         rez.ui_fn = ui_fn;
         rez.on_unhover = clear_tooltip;
