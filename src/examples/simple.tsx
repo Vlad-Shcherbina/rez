@@ -25,7 +25,7 @@ function App() {
         let ctx = bang(canvas.getContext("2d"));
         zones.push({
             priority: -1000,
-            paint: () => {
+            paint: ({ ui_fn_count, paint_count }) => {
                 assert(canvas.width % 400 === 0, `${canvas.width} ${canvas.height}`); // % to allow for DPI factor
                 ctx.fillStyle = "black";
                 for (let i = 0; i < width; i += 2) {
@@ -36,6 +36,12 @@ function App() {
                     ctx.fillRect(0, i, 1, 1);
                     ctx.fillRect(width - 1, i, 1, 1);
                 }
+                ctx.fillStyle = "black";
+                ctx.font = "12px monospace";
+                ctx.textAlign = "left";
+                ctx.textBaseline = "top";
+                ctx.fillText(`ui_fn: ${ui_fn_count}`, 4, 4);
+                ctx.fillText(`paint: ${paint_count}`, 4, 18);
             },
         });
 

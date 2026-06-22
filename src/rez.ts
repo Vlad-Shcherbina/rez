@@ -4,7 +4,14 @@ export type Zone = {
     priority: number,
     sdf?: (x: number, y: number) => number,  // negative for inside
     cursor?: string,
-    paint?: (args: { hovered: boolean, hovered_zone: Zone | null }) => void,
+    paint?: (args: {
+        hovered: boolean,
+        hovered_zone: Zone | null,
+
+        // for debugging repaints
+        ui_fn_count: number,
+        paint_count: number,
+    }) => void,
     on_left_mouse_down?: (args: { x: number, y: number }) => void,
     on_left_mouse_up?: (args: { x: number, y: number }) => void,
 
@@ -39,6 +46,9 @@ export class Rez {
     private height = 0;
     private width_pixels = 0;
     private height_pixels = 0;
+
+    private ui_fn_count = 0;
+    private paint_count = 0;
 
     private zones: Zone[] | typeof NOT_COMPUTED = NOT_COMPUTED;
     private hovered_zone: Zone | null | typeof NOT_COMPUTED = NOT_COMPUTED;
@@ -228,7 +238,8 @@ export class Rez {
         if (this.width === 0) return [];
 
         if (this.log) console.time("ui_fn");
-        let zones = this.ui_fn({ canvas: this.#canvas, width: this.width, height: this.height });
+        this.ui_fn_count += 1;
+        let zones = this.#ui_fn({ canvas: this.#canvas, width: this.width, height: this.height });
         if (this.log) console.timeEnd("ui_fn");
         zones.sort((a, b) => a.priority - b.priority);
         this.zones = zones;
@@ -293,8 +304,9 @@ export class Rez {
         ctx.scale(this.dpr, this.dpr);
 
         for (let z of zones) {
-            z.paint?.({ hovered: z === hovered_zone, hovered_zone });
+            z.paint?.({ hovered: z === hovered_zone, hovered_zone, ui_fn_count: this.ui_fn_count, paint_count: this.paint_count });
         }
+        this.paint_count += 1;
         if (this.log) console.timeEnd("rez.paint()");
     }
 }
