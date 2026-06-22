@@ -293,7 +293,10 @@ export class Rez {
 
         if (!this.af_requested) {
             this.af_requested = true;
-            requestAnimationFrame(() => this.paint());
+            requestAnimationFrame(() => {
+                this.af_requested = false;
+                this.paint();
+            });
         }
     }
 
@@ -301,7 +304,6 @@ export class Rez {
         if (this.#canvas === null) return;
         if (!this.repaint_needed) return;
         this.repaint_needed = false;
-        this.af_requested = false;
 
         let zones = this.get_zones();
         let hovered_zone = this.get_hovered_zone();
