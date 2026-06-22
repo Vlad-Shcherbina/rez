@@ -4,7 +4,7 @@ import { createRoot } from "react-dom/client";
 import { UiFn, Zone } from "../rez";
 import { make_circle_sdf } from "../sdfs";
 import { useTooltip } from "../tooltip";
-import { StrictMode, useRef, useState } from "react";
+import { StrictMode, useLayoutEffect, useRef, useState } from "react";
 import { useRez } from "../rerez";
 
 function App() {
@@ -100,8 +100,12 @@ function App() {
 
         return zones;
     }
-    rez.ui_fn = ui_fn;
-    rez.on_unhover = clear_tooltip;
+
+    // Maybe pass ui_fn and on_hover to useRez and move the effect there?
+    useLayoutEffect(() => {
+        rez.ui_fn = ui_fn;
+        rez.on_unhover = clear_tooltip;
+    });
 
     return <>
         <h3>Simple example</h3>

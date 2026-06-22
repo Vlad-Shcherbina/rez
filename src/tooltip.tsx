@@ -1,4 +1,4 @@
-import { useEffect, useRef, useCallback, ReactNode } from "react";
+import { useLayoutEffect, useRef, useCallback, ReactNode } from "react";
 import { createRoot, Root } from "react-dom/client";
 import { bang } from "./assert";
 
@@ -6,7 +6,7 @@ export function useTooltip() {
     let div_ref = useRef<HTMLDivElement | null>(null);
     let root_ref = useRef<Root | null>(null);
 
-    useEffect(() => {
+    useLayoutEffect(() => {
         let el = document.createElement("div");
         el.style.cssText = `
             opacity: 0.9;
