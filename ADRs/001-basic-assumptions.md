@@ -2,6 +2,8 @@
 
 Desktop-only, with mouse (no attempt to support touch).
 
+Mainly used inside React app, but implemented with a React-free core.
+
 Only full repaints (partial repaints are complicated and error-prone).
 
 O(n) for hit testing is ok (so no spatial data structures, etc.)
@@ -21,8 +23,5 @@ Encourage hover effects (interactive elements should change their appearance on 
 Encourage DPI-independence.
 
 Decouple from tooltip system (but support integration and encourage tooltips).
-
-For simplicity, we assume it's always meant to be used with React.
-(The original rez was framework-independent, with a separate React wrapper on top; but impedance mismatch was adding complexity).
 
 No support for testing (though in theory it would be nice, especially random clicking).

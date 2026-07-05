@@ -1,5 +1,7 @@
 # Hover Detail
 
+Status: superseded by [./007-paint-state.md]
+
 It's a global piece of state internal to Rez.
 It can be changed when mouse is moved, and its changes trigger repaints.
 
