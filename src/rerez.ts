@@ -1,8 +1,10 @@
-import { RefObject, useLayoutEffect, useState } from "react";
+import { RefObject, useLayoutEffect, useRef } from "react";
 import { PaintState, Rez } from "./rez";
 
 export function useRez(canvas_ref: RefObject<HTMLCanvasElement | null>) {
-    let [rez, _] = useState<Rez>(() => new Rez());
+    let rez_ref = useRef<Rez>(null);
+    rez_ref.current ??= new Rez();
+    let rez = rez_ref.current;
     useLayoutEffect(() => {
         // "destructor"
         return () => { rez.canvas = null; }
@@ -14,7 +16,9 @@ export function useRez(canvas_ref: RefObject<HTMLCanvasElement | null>) {
 }
 
 export function usePaintState<T>(f: () => T) {
-    let [ps, _] = useState(() => new PaintState(f()));
+    let ps_ref = useRef<PaintState<T>>(null);
+    ps_ref.current ??= new PaintState(f());
+    let ps = ps_ref.current;
     let get_ps = () => ps.get();
     let set_ps = (value: T) => ps.set(value);
     // TODO: maybe allow passing old->new function?
