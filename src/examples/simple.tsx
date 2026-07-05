@@ -5,7 +5,7 @@ import { UiFn, Zone } from "../rez";
 import { make_circle_sdf } from "../sdfs";
 import { useTooltip } from "../tooltip";
 import { StrictMode, useLayoutEffect, useRef, useState } from "react";
-import { useRez } from "../rerez";
+import { usePaintState, useRez } from "../rerez";
 
 function App() {
     let canvas_ref = useRef<HTMLCanvasElement>(null);
@@ -15,6 +15,8 @@ function App() {
     let [toggled, set_toggled] = useState([true, false, false]);
 
     let { set_tooltip, clear_tooltip } = useTooltip();
+
+    let [get_x, set_x] = usePaintState(() => 0);
 
     let ui_fn: UiFn = ({canvas, width, height}) => {
         assert(canvas.width % 400 === 0, `${canvas.width} ${canvas.height}`); // % to allow for DPI factor
@@ -57,6 +59,14 @@ function App() {
                     ctx.arc(x, y, r, 0, Math.PI * 2);
                     ctx.stroke();
                     ctx.fill();
+
+                    if (i === 0 && toggled[i]) {
+                        ctx.fillStyle = "black";
+                        ctx.font = "12px monospace";
+                        ctx.textAlign = "left";
+                        ctx.textBaseline = "middle";
+                        ctx.fillText(`paint state x: ${get_x()}`, x - 30, y);
+                    }
                 },
                 on_hover: ({event}) => {
                     set_tooltip(<>Click to make {toggled[i] ? "yellow" : "green"}</>, event);
@@ -80,7 +90,8 @@ function App() {
                 ctx.arc(x, y, r, 0, Math.PI * 2);
                 ctx.fill();
             },
-            on_hover: ({event}) => {
+            on_hover: ({event, x}) => {
+                set_x(x);
                 set_tooltip(<>Hover indicator is in a separate zone</>, event);
             },
         };
@@ -102,7 +113,10 @@ function App() {
     // Maybe pass ui_fn and on_hover to useRez and move the effect there? (anchor: VhPJQYue)
     useLayoutEffect(() => {
         rez.ui_fn = ui_fn;
-        rez.on_unhover = clear_tooltip;
+        rez.on_unhover = () => {
+            set_x(-1);
+            clear_tooltip();
+        }
     });
 
     return <>

@@ -57,6 +57,9 @@ export class Rez {
 
     private unsubscribe = new AbortController();
 
+    // meant to be private, but we need to access it from PaintState
+    paint_states: Set<PaintState<unknown>> = new Set();
+
     on_unhover: () => void = () => {};
 
     log: boolean = true;
@@ -162,16 +165,13 @@ export class Rez {
             if (this.hovered_zone !== null) {
                 this.hovered_zone = null;
                 this.repaint_needed = true;
-                this.on_unhover();
+                call_handler(() => this.on_unhover());
             }
 
             if (this.repaint_needed) {
                 this.request_repaint();
             }
         }, { signal: this.unsubscribe.signal });
-
-        // let update_mouse_pos = (e: PointerEvent) => {
-        // }
 
         c.addEventListener("pointermove", (e) => {
             this.update_mouse_pos(e);
@@ -181,7 +181,9 @@ export class Rez {
             c.setPointerCapture(e.pointerId);
             let { mouse_pos, hovered_zone } = this.update_mouse_pos(e);
             if (e.button === 0) {
-                hovered_zone?.on_left_mouse_down?.(mouse_pos);
+                call_handler(() => {
+                    hovered_zone?.on_left_mouse_down?.(mouse_pos);
+                });
             }
         }, { signal: this.unsubscribe.signal });
 
@@ -189,7 +191,9 @@ export class Rez {
             c.releasePointerCapture(e.pointerId);
             let { mouse_pos, hovered_zone } = this.update_mouse_pos(e);
             if (e.button === 0) {
-                hovered_zone?.on_left_mouse_up?.(mouse_pos);
+                call_handler(() => {
+                    hovered_zone?.on_left_mouse_up?.(mouse_pos);
+                });
             }
         }, { signal: this.unsubscribe.signal });
 
@@ -207,7 +211,7 @@ export class Rez {
 
         if (this.hovered_zone !== null) {
             this.hovered_zone = null;
-            this.on_unhover();
+            call_handler(() => this.on_unhover());
             this.request_repaint();
         }
 
@@ -228,12 +232,15 @@ export class Rez {
             this.request_repaint();
         }
         let on_hover = hovered_zone?.on_hover;
-        if (on_hover) {
-            let { x, y } = this.mouse_pos;
-            on_hover({ x, y, event: this.mouse_event } )
-        } else {
-            this.on_unhover();
-        }
+
+        call_handler(() => {
+            if (on_hover) {
+                let { x, y } = coords;
+                on_hover({ x, y, event: e });
+            } else {
+                this.on_unhover();
+            }
+        });
 
         this.#canvas.style.cursor = hovered_zone?.cursor || "default";
         return { mouse_pos: this.mouse_pos, hovered_zone };
@@ -316,9 +323,23 @@ export class Rez {
         ctx.clearRect(0, 0, canvas.width, canvas.height);
         ctx.scale(this.dpr, this.dpr);
 
+        for (let ps of this.paint_states) {
+            let had = ps.subscribers.delete(this);
+            assert(had);
+        }
+        this.paint_states.clear();
+
+        assert(current_rez_for_paint_state === DISALLOWED);
+        // Intentional: publish the currently-painting Rez as ambient context
+        // for PaintState.get()/set(). Not the pre-ES6 `const self = this` pattern.
+        // eslint-disable-next-line @typescript-eslint/no-this-alias
+        current_rez_for_paint_state = this;
         for (let z of zones) {
             z.paint?.({ hovered: z === hovered_zone, hovered_zone, ui_fn_count: this.ui_fn_count, paint_count: this.paint_count });
         }
+        assert(current_rez_for_paint_state === this);
+        current_rez_for_paint_state = DISALLOWED;
+
         this.paint_count += 1;
         if (this.log) console.timeEnd("rez.paint()");
     }
@@ -342,3 +363,50 @@ export function pointer_event_to_canvas_coords(e: PointerEvent | WheelEvent, can
 }
 
 const NOT_COMPUTED: unique symbol = Symbol('NOT_COMPUTED');
+
+export class PaintState<T> {
+    #value: T;
+    subscribers: Set<Rez> = new Set();
+
+    constructor(value: T) {
+        this.#value = value;
+    }
+
+    get(): T {
+        assert(current_rez_for_paint_state !== DISALLOWED, "paint state can only be accessed in paint() or event handler");
+        if (current_rez_for_paint_state !== NONE) {
+            let rez = current_rez_for_paint_state;
+            if (this.subscribers.has(rez)) {
+                assert(rez.paint_states.has(this));
+            } else {
+                assert(!rez.paint_states.has(this));
+                this.subscribers.add(rez);
+                rez.paint_states.add(this);
+            }
+        }
+        return this.#value;
+    }
+
+    set(value: T) {
+        if (this.#value === value) return;
+        this.#value = value;
+        for (let rez of this.subscribers) {
+            rez.request_repaint();
+        }
+    }
+}
+
+const NONE: unique symbol = Symbol('NONE');
+const DISALLOWED: unique symbol = Symbol('DISALLOWED');
+
+// Set to a specific Rez instance when painting,
+// to NONE in event handlers, and to DISALLOWED elsewhere (e.g. in ui_fn()).
+let current_rez_for_paint_state: Rez | typeof NONE | typeof DISALLOWED = DISALLOWED;
+
+function call_handler(f: () => void) {
+    assert(current_rez_for_paint_state === DISALLOWED);
+    current_rez_for_paint_state = NONE;
+    f();
+    assert(current_rez_for_paint_state === NONE);
+    current_rez_for_paint_state = DISALLOWED;
+}
