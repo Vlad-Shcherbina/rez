@@ -1,7 +1,7 @@
 import "../offensive";
 import { bang } from "../assert";
 import { createRoot } from "react-dom/client";
-import { UiFn, Zone } from "../rez";
+import { UiFn, Zone, pointer_event_to_canvas_coords } from "../rez";
 import { make_box_sdf, make_circle_sdf } from "../sdfs";
 import { useTooltip } from "../tooltip";
 import { StrictMode, useLayoutEffect, useRef, useState } from "react";
@@ -31,6 +31,33 @@ function fit_zoom(stars: { x: number, y: number }[], width: number, height: numb
     let offset_x = width / 2 - scale * (min_x + max_x) / 2;
     let offset_y = height / 2 - scale * (min_y + max_y) / 2;
     return { offset_x, offset_y, scale };
+}
+
+// Scale by `factor` about the screen point (sx, sy), keeping the world point
+// currently under (sx, sy) fixed on screen.
+function zoom_around(z: Zoom, sx: number, sy: number, factor: number): Zoom {
+    return {
+        scale: z.scale * factor,
+        offset_x: sx - (sx - z.offset_x) * factor,
+        offset_y: sy - (sy - z.offset_y) * factor,
+    };
+}
+
+// Adapted from d3-zoom:
+// https://github.com/d3/d3-zoom/blob/c8df708b78b46553bc4a0fbf1baf4ffc10cef8bd/src/zoom.js#L35
+function wheel_zoom_factor(e: WheelEvent): number {
+    let per_unit =
+        e.deltaMode === e.DOM_DELTA_LINE ? 0.05 :
+        e.deltaMode === e.DOM_DELTA_PAGE ? 1 :
+        0.002;  // per pixel
+
+    // A trackpad pinch on macOS arrives as wheel events with ctrlKey set and tiny
+    // deltas, so we amplify those to make pinch-to-zoom usable (this also covers an
+    // explicit Ctrl+wheel).
+    let exponent = -e.deltaY * per_unit * (e.ctrlKey ? 10 : 1);
+
+    exponent = Math.max(-0.5, Math.min(0.5, exponent));
+    return Math.pow(2, exponent);
 }
 
 function App() {
@@ -139,6 +166,22 @@ function App() {
             clear_tooltip();
         }
     });
+
+    // Wheel zoom is a pure canvas concern (no zones involved), so it doesn't go
+    // through rez - we just listen on the canvas directly.
+    useLayoutEffect(() => {
+        let canvas = bang(canvas_ref.current);
+        let on_wheel = (e: WheelEvent) => {
+            e.preventDefault();
+            // Read coords eagerly: the functional updater below runs later (next
+            // render), by which point e.currentTarget is cleared. (anchor: XQOEPuOg)
+            let { x, y } = pointer_event_to_canvas_coords(e, canvas);
+            let factor = wheel_zoom_factor(e);
+            set_zoom(old => old === null ? old : zoom_around(old, x, y, factor));
+        };
+        canvas.addEventListener("wheel", on_wheel, { passive: false });
+        return () => canvas.removeEventListener("wheel", on_wheel);
+    }, []);
 
     return <>
         <canvas
