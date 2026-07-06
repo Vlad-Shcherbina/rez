@@ -5,7 +5,7 @@ import { UiFn, Zone, pointer_event_to_canvas_coords } from "../rez";
 import { make_box_sdf, make_circle_sdf } from "../sdfs";
 import { useTooltip } from "../tooltip";
 import { StrictMode, useLayoutEffect, useRef, useState } from "react";
-import { useRez } from "../rerez";
+import { usePaintState, useRez } from "../rerez";
 
 // world -> screen: screen = world * scale + offset
 type Zoom = { offset_x: number, offset_y: number, scale: number };
@@ -75,6 +75,15 @@ function App() {
     // canvas size, which only becomes available then.
     let [maybe_zoom, set_zoom] = useState<Zoom | null>(null);
 
+    // Committed vs transient state: the drag origin changes zone structure
+    // (overlay and button zones appear/disappear), so it's React state.
+    // The live pointer position only moves pixels, so it's paint state:
+    // each pointermove costs one repaint, with no rerender and no ui_fn.
+    // The accumulated delta is folded into `zoom` on release.
+    let [drag_origin, set_drag_origin] = useState<{ x: number, y: number } | null>(null);
+    let [get_live_x, set_live_x] = usePaintState(() => 0);
+    let [get_live_y, set_live_y] = usePaintState(() => 0);
+
     let ui_fn: UiFn = ({ canvas, width, height }) => {
         let zones: Zone[] = [];
         let ctx = bang(canvas.getContext("2d"));
@@ -86,6 +95,7 @@ function App() {
 
         zones.push({
             priority: -1000,
+            sdf: () => -1,
             paint: ({ ui_fn_count, paint_count }) => {
                 ctx.fillStyle = "#f6f6f6";
                 ctx.fillRect(0, 0, width, height);
@@ -97,44 +107,81 @@ function App() {
                 ctx.fillText(`ui_fn: ${ui_fn_count}`, 4, 4);
                 ctx.fillText(`paint: ${paint_count}`, 4, 18);
             },
+            on_left_mouse_down: ({ x, y }) => {
+                // Initialize the live position eagerly, so the first painted frame
+                // of the drag doesn't depend on the post-ui_fn re-hover having run.
+                set_live_x(x);
+                set_live_y(y);
+                set_drag_origin({ x, y });
+            }
         });
 
-        // "Zoom to fit" button in the top right corner.
-        let margin = 12;
-        let size = 28;
-        let cx = width - margin - size / 2;
-        let cy = margin + size / 2;
-
-        zones.push({
-            priority: 0,
-            sdf: make_box_sdf(cx, cy, size / 2, size / 2),
-            cursor: "pointer",
-            paint: ({ hovered }) => {
-                // A square made of four corner brackets spanning the whole button.
-                let h = size / 2; // half-extent of the button square
-                let arm = size / 3; // length of each corner arm
-                ctx.strokeStyle = "#333";
-                ctx.lineWidth = hovered ? 3 : 1.5;
-                ctx.lineCap = "round";
-                for (let sx of [-1, 1]) {
-                    for (let sy of [-1, 1]) {
-                        let x = cx + sx * h;
-                        let y = cy + sy * h;
-                        ctx.beginPath();
-                        ctx.moveTo(x - sx * arm, y);
-                        ctx.lineTo(x, y);
-                        ctx.lineTo(x, y - sy * arm);
-                        ctx.stroke();
-                    }
+        if (drag_origin !== null) {
+            let origin_x = drag_origin.x;
+            let origin_y = drag_origin.y;
+            zones.push({
+                priority: -999,
+                paint: () => {
+                    ctx.translate(get_live_x() - origin_x, get_live_y() - origin_y);
                 }
-            },
-            on_hover: ({ event }) => {
-                set_tooltip(<>zoom to fit</>, event);
-            },
-            on_left_mouse_down: () => {
-                set_zoom(fit_zoom(stars, width, height));
-            },
-        });
+            });
+            zones.push({
+                priority: 1000,
+                sdf: () => -1,
+                cursor: "grabbing",
+                on_left_mouse_up: ({ x, y }) => {
+                    set_drag_origin(null);
+                    set_zoom({
+                        offset_x: zoom.offset_x + x - origin_x,
+                        offset_y: zoom.offset_y + y - origin_y,
+                        scale: zoom.scale,
+                    });
+                },
+                on_hover: ({ x, y }) => {
+                    set_live_x(x);
+                    set_live_y(y);
+                }
+            })
+        }
+
+        if (drag_origin === null) {
+            // "Zoom to fit" button in the top right corner.
+            let margin = 12;
+            let size = 28;
+            let cx = width - margin - size / 2;
+            let cy = margin + size / 2;
+
+            zones.push({
+                priority: 0,
+                sdf: make_box_sdf(cx, cy, size / 2, size / 2),
+                cursor: "pointer",
+                paint: ({ hovered }) => {
+                    // A square made of four corner brackets spanning the whole button.
+                    let h = size / 2; // half-extent of the button square
+                    let arm = size / 3; // length of each corner arm
+                    ctx.strokeStyle = "#333";
+                    ctx.lineWidth = hovered ? 3 : 1.5;
+                    ctx.lineCap = "round";
+                    for (let sx of [-1, 1]) {
+                        for (let sy of [-1, 1]) {
+                            let x = cx + sx * h;
+                            let y = cy + sy * h;
+                            ctx.beginPath();
+                            ctx.moveTo(x - sx * arm, y);
+                            ctx.lineTo(x, y);
+                            ctx.lineTo(x, y - sy * arm);
+                            ctx.stroke();
+                        }
+                    }
+                },
+                on_hover: ({ event }) => {
+                    set_tooltip(<>zoom to fit</>, event);
+                },
+                on_left_mouse_down: () => {
+                    set_zoom(fit_zoom(stars, width, height));
+                },
+            });
+        }
 
         // Stars.
         for (let star of stars) {
