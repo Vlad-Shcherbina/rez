@@ -4,6 +4,12 @@ export type Zone = {
     priority: number,
     sdf?: (x: number, y: number) => number,  // negative for inside
     cursor?: string,
+    /**
+     * Zones paint in priority order into a shared ctx whose transform is reset
+     * once per pass, so ctx state deliberately leaks from lower- to higher-priority
+     * zones (e.g. a paint-only zone can ctx.translate() everything painted after it,
+     * see ADRs/006-drag-hack.md).
+     */
     paint?: (args: {
         hovered: boolean,
         hovered_zone: Zone | null,
