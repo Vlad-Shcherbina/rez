@@ -75,7 +75,7 @@ function App() {
     // canvas size, which only becomes available then.
     let [maybe_zoom, set_zoom] = useState<Zoom | null>(null);
 
-    // Committed vs transient state: the drag origin changes zone structure
+    // Committed vs transient state (anchor: yFg3E1rq): the drag origin changes zone structure
     // (overlay and button zones appear/disappear), so it's React state.
     // The live pointer position only moves pixels, so it's paint state:
     // each pointermove costs one repaint, with no rerender and no ui_fn.
@@ -88,6 +88,7 @@ function App() {
         let zones: Zone[] = [];
         let ctx = bang(canvas.getContext("2d"));
 
+        // Deriving state that needs canvas size. anchor: T02u6vSM
         // maybe_zoom -> the persisted state, possibly not initialized yet.
         // zoom -> the transform to actually use this frame, always present.
         let zoom = maybe_zoom ?? fit_zoom(stars, width, height);
@@ -95,7 +96,7 @@ function App() {
 
         zones.push({
             priority: -1000,
-            sdf: () => -1,
+            sdf: () => -1, // catch-all: the zone covers everything. anchor: JYtu0kft
             paint: ({ ui_fn_count, paint_count }) => {
                 ctx.fillStyle = "#f6f6f6";
                 ctx.fillRect(0, 0, width, height);
@@ -190,7 +191,7 @@ function App() {
             let r = 3;
             zones.push({
                 priority: 1,
-                sdf: make_circle_sdf(sx, sy, 2 * r),
+                sdf: make_circle_sdf(sx, sy, 2 * r), // hit area bigger than the painted star. anchor: tS4B9KXi
                 paint: ({ hovered }) => {
                     ctx.beginPath();
                     ctx.arc(sx, sy, hovered ? r + 3 : r, 0, Math.PI * 2);
@@ -215,7 +216,7 @@ function App() {
     });
 
     // Wheel zoom is a pure canvas concern (no zones involved), so it doesn't go
-    // through rez - we just listen on the canvas directly.
+    // through rez - we just listen on the canvas directly. anchor: yFfLKf0l
     useLayoutEffect(() => {
         let canvas = bang(canvas_ref.current);
         let on_wheel = (e: WheelEvent) => {

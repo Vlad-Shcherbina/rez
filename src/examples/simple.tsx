@@ -51,6 +51,7 @@ function App() {
             zones.push({
                 priority: 0,
                 sdf: make_circle_sdf(x, y, r),
+                // Hover effect: restyle based on the `hovered` flag. anchor: 31ImAttW
                 paint: ({hovered}) => {
                     ctx.fillStyle = toggled[i] ? "green" : "yellow";
                     ctx.strokeStyle = hovered ? "black" : "gray";
@@ -60,6 +61,8 @@ function App() {
                     ctx.stroke();
                     ctx.fill();
 
+                    // Live readout via paint state: updated by another zone's on_hover,
+                    // repainted without a rerender. anchor: spqEMBfi
                     if (i === 0 && toggled[i]) {
                         ctx.fillStyle = "black";
                         ctx.font = "12px monospace";
@@ -81,6 +84,7 @@ function App() {
         let x = 250;
         let y = 250;
         let r = 30;
+        // Hover indicator painted by a separate zone at a different priority. anchor: H8XbZthF
         let z: Zone = {
             priority: 0,
             sdf: make_circle_sdf(x, y, r),
@@ -91,7 +95,7 @@ function App() {
                 ctx.fill();
             },
             on_hover: ({event, x}) => {
-                set_x(x);
+                set_x(x); // anchor: spqEMBfi
                 set_tooltip(<>Hover indicator is in a separate zone</>, event);
             },
         };
@@ -114,7 +118,7 @@ function App() {
     useLayoutEffect(() => {
         rez.ui_fn = ui_fn;
         rez.on_unhover = () => {
-            set_x(-1);
+            set_x(-1); // anchor: spqEMBfi
             clear_tooltip();
         }
     });
