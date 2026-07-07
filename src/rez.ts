@@ -340,11 +340,14 @@ export class Rez {
         // for PaintState.get()/set(). Not the pre-ES6 `const self = this` pattern.
         // eslint-disable-next-line @typescript-eslint/no-this-alias
         current_rez_for_paint_state = this;
-        for (let z of zones) {
-            z.paint?.({ hovered: z === hovered_zone, hovered_zone, ui_fn_count: this.ui_fn_count, paint_count: this.paint_count });
+        try {
+            for (let z of zones) {
+                z.paint?.({ hovered: z === hovered_zone, hovered_zone, ui_fn_count: this.ui_fn_count, paint_count: this.paint_count });
+            }
+        } finally {
+            assert(current_rez_for_paint_state === this);
+            current_rez_for_paint_state = DISALLOWED;
         }
-        assert(current_rez_for_paint_state === this);
-        current_rez_for_paint_state = DISALLOWED;
 
         this.paint_count += 1;
         if (this.log) console.timeEnd("rez.paint()");
@@ -412,7 +415,10 @@ let current_rez_for_paint_state: Rez | typeof NONE | typeof DISALLOWED = DISALLO
 function call_handler(f: () => void) {
     assert(current_rez_for_paint_state === DISALLOWED);
     current_rez_for_paint_state = NONE;
-    f();
-    assert(current_rez_for_paint_state === NONE);
-    current_rez_for_paint_state = DISALLOWED;
+    try {
+        f();
+    } finally {
+        assert(current_rez_for_paint_state === NONE);
+        current_rez_for_paint_state = DISALLOWED;
+    }
 }
