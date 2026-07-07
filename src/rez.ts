@@ -185,10 +185,14 @@ export class Rez {
                 // observes the correct canvas.width/height. ui_fn() can run before the first
                 // paint(), e.g. from the pointermove handler (see anchor: R0OI8LKK).
                 // Guarded because assigning width/height clears the bitmap even when the
-                // value is unchanged, and the initial callback after observe() can deliver
-                // an unchanged size (e.g. a reattach of the same canvas); skipping the
-                // assignment keeps the pixels valid, so reconcile correctly derives
-                // "nothing to repaint".
+                // value is unchanged. That matters when this callback fires with the
+                // rounded pixel size unchanged and reconcile derives "nothing to repaint"
+                // (zones memo hit): an unconditional assignment would blank the canvas.
+                // Reachable via the content-box fallback, where a fractional CSS resize
+                // can round to the same pixel size. (The initial fire after observe() can
+                // also deliver an unchanged size — e.g. reattaching the same canvas — but
+                // that case is safe either way: zones were reset on attach, so reconcile
+                // repaints below.)
                 if (c.width !== width_pixels) c.width = width_pixels;
                 if (c.height !== height_pixels) c.height = height_pixels;
 
