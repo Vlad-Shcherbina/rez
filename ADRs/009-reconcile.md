@@ -52,28 +52,18 @@ zero, and the guaranteed initial ResizeObserver fire supplies the real size
 
 - Repaint is derived, not pushed: repaint iff `zones` or `hovered_zone`
   changed identity. The only push-style trigger left is `PaintState.set`.
-- `on_hover` is a *level* handler: it fires on every reconcile while the
-  mouse is over a zone that has it. Apps rely on this for live coordinates
-  (see [./006-drag-hack.md]), and it is what makes hover state
-  path-independent across `ui_fn` changes. It must be idempotent (see the
-  `Zone.on_hover` doc comment).
-- `on_unhover` is a *transition* handler: it fires once, on the falling edge
-  of "an on_hover has been dispatched", tracked by a single `hover_active`
-  boolean written in one place. In particular it never fires while the mouse
-  is elsewhere, so it cannot clobber a tooltip that meanwhile belongs to
-  another element (or another Rez) sharing the same tooltip system. It should
-  still tolerate redundant calls — the exactly-once behavior is an
-  implementation nicety, not a contract.
+- `on_hover` is a *level* handler; `on_unhover` is a *transition* handler on
+  the falling edge of "an on_hover has been dispatched". The exact semantics,
+  the reasons for the asymmetry, and the handler contracts live at the
+  dispatch site and on the handler declarations (anchor: m0h5cK7X).
 - Cursor: idempotent assignment on every reconcile.
 
 ## Scheduling
 
 Two timing regimes: "immediately, inside the input event" and "at
-frame time". A ResizeObserver callback runs in the frame's rendering steps,
-after layout and before the frame is presented — the same slot as rAF — so
-the "synchronous" paint there is not out-of-band: it is a frame-time paint
-that lands in the same frame where the resolution change cleared the bitmap,
-which is exactly why there is no flicker.
+frame time". Even the "sync" paint in the resize row below is frame-time:
+a ResizeObserver callback runs in the frame's rendering steps, the same slot
+as rAF (why painting there is what avoids flicker: anchor: IJ5uYVqh).
 
 | input change          | reconcile               | paint                                        |
 |-----------------------|-------------------------|----------------------------------------------|
@@ -85,23 +75,17 @@ which is exactly why there is no flicker.
 | `PaintState.set`      | — (paint-only input)    | rAF, subscribers only                        |
 
 Why the microtasks for `ui_fn` and canvas: both setters run mid-React-commit
-(from `useLayoutEffect`). Reconciling synchronously would fire app handlers —
-which call `setState` — before sibling effects of the same commit have run
-(e.g. before `on_unhover` is reassigned on the next line), and would make the
-`ui_fn -> on_hover -> setState -> rerender -> ui_fn` cycle recursive. The
-microtask runs after the commit settles, so each round of that cycle is a
-flat ping-pong, terminated by the app-side equality cutoffs. The canvas
-reconcile can only dispatch `on_unhover` — the setter clears the mouse event,
-so there is no zone to hover — but it is the same hazard, and deferring it
-means the falling edge on a canvas swap reaches the freshly assigned
-`on_unhover`, not the stale one. A microtask still runs before the initial
-ResizeObserver fire, so derived values are settled before the first paint.
+(from `useLayoutEffect`), where reconciling synchronously would dispatch app
+handlers too early (anchor: 76UVNDC4 spells out how). Deferring keeps the
+`ui_fn -> on_hover -> setState -> rerender -> ui_fn` cycle a flat ping-pong,
+terminated by the app-side equality cutoffs. A microtask still runs before
+the initial ResizeObserver fire, so derived values are settled before the
+first paint.
 
 Why pointer events reconcile synchronously: `on_left_mouse_down/up` must be
-dispatched to a `hovered_zone` computed from the very event being handled
-(the pointer may have moved since the last pointermove). Consequence:
-`on_hover` fires before `on_left_mouse_down`, so the down handler sees the
-same world the hover handlers saw.
+dispatched to a `hovered_zone` computed from the very event being handled;
+consequence: `on_hover` fires before `on_left_mouse_down`, so the down
+handler sees the same world the hover handlers saw.
 
 ## Known limitations
 

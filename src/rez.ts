@@ -26,7 +26,7 @@ export type Zone = {
      * or when the zone first comes into existence and the mouse happens to be over it already.
      *
      * After any state change that triggers `ui_fn` recomputation and repaint,
-     * we intentionally rerun current_zone.on_hover.
+     * we intentionally rerun current_zone.on_hover (anchor: m0h5cK7X).
      * It is important that we don't set state redundantly in on_hover handler.
      * This happens automatically for primitive types in React state,
      * but for composite state types an explicit check is needed:
@@ -84,6 +84,11 @@ export class Rez {
     // meant to be private, but we need to access it from PaintState
     paint_states: Set<PaintState<unknown>> = new Set();
 
+    /**
+     * Fires on the falling edge of "an on_hover has been dispatched"
+     * (anchor: m0h5cK7X). Should tolerate redundant calls: the exactly-once
+     * behavior is an implementation nicety, not a contract.
+     */
     on_unhover: () => void = () => {};
 
     log: boolean = true;
@@ -93,9 +98,11 @@ export class Rez {
     get ui_fn() { return this.#ui_fn; }
     set ui_fn(f: UiFn) {
         this.#ui_fn = f;
+        // anchor: 76UVNDC4
         // Deferred: this setter runs mid-React-commit (from useLayoutEffect).
         // Reconciling synchronously would fire app handlers before sibling effects
-        // of the same commit have run, and would make the
+        // of the same commit have run (e.g. before on_unhover is reassigned on the
+        // next line), and would make the
         // ui_fn -> on_hover -> setState -> rerender -> ui_fn cycle recursive
         // instead of a flat microtask ping-pong.
         queueMicrotask(() => this.reconcile("frame"));
@@ -118,9 +125,11 @@ export class Rez {
         this.unsubscribe.abort();
         this.unsubscribe = new AbortController();
 
-        // Deferred for the same reason as in the ui_fn setter: this setter also runs
-        // mid-React-commit (from useLayoutEffect), and this reconcile can fire
-        // on_unhover, releasing hover held against the old canvas.
+        // Deferred for the same reason as in the ui_fn setter (anchor: 76UVNDC4):
+        // this setter also runs mid-React-commit, and this reconcile can fire
+        // on_unhover, releasing hover held against the old canvas. Deferring also
+        // means that falling edge reaches the on_unhover assigned in the same
+        // commit, not the stale one.
         //
         // anchor: R0OI8LKK
         // It must not paint yet: the new size is unknown until the initial
@@ -185,6 +194,7 @@ export class Rez {
 
                 if (this.log) console.log("resize obs", { dpr, width_pixels, height_pixels, width, height });
 
+                // anchor: IJ5uYVqh
                 // Paint synchronously ("now") rather than in rAF to avoid flicker:
                 // the resolution change cleared the canvas, and this callback runs in
                 // the frame's rendering steps (the same slot as rAF), before the frame
@@ -260,9 +270,10 @@ export class Rez {
             this.repaint_needed = true;
         }
 
+        // anchor: m0h5cK7X
         // on_hover is a level handler: it fires on every reconcile while the mouse is
-        // over a zone that has it (apps rely on this for live coordinates, and it makes
-        // hover state path-independent across ui_fn changes; see Zone.on_hover).
+        // over a zone that has it (apps rely on this for live coordinates, and it
+        // makes hover state path-independent across ui_fn changes).
         // on_unhover is a transition handler: it fires once, on the falling edge of
         // "an on_hover has been dispatched", and never while the mouse is elsewhere,
         // so it can't clobber a tooltip that meanwhile belongs to another element.

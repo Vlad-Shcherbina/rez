@@ -11,7 +11,8 @@ The gesture state is split in two (see [./007-paint-state.md]):
 While the drag is active:
 
 - A catch-all zone (`sdf: () => -1`) at high priority captures `on_hover`
-  (which records the live position) and `on_left_mouse_up` (which commits),
+  (which records the live position, relying on the level-triggered dispatch,
+  anchor: m0h5cK7X) and `on_left_mouse_up` (which commits),
   and suppresses hover interaction with everything underneath.
 - A paint-only zone at low priority applies `ctx.translate(live - origin)`,
   shifting everything painted after it. This deliberately exploits the shared-ctx
