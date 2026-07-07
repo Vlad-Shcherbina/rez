@@ -118,10 +118,21 @@ export class Rez {
         this.unsubscribe.abort();
         this.unsubscribe = new AbortController();
 
-        if (c === null) {
-            this.reconcile("frame");
-            return;
-        }
+        // Deferred for the same reason as in the ui_fn setter: this setter also runs
+        // mid-React-commit (from useLayoutEffect), and this reconcile can fire
+        // on_unhover, releasing hover held against the old canvas.
+        //
+        // anchor: R0OI8LKK
+        // It must not paint yet: the new size is unknown until the initial
+        // ResizeObserver callback, which runs after layout with the accurate
+        // resolution (rAF callbacks fire before ResizeObserver callbacks, so even a
+        // rAF-scheduled paint would be too early). The width === 0 guards in
+        // request_repaint() and paint() defer the actual painting to that callback.
+        // ResizeObserver is guaranteed to trigger once after we started observing
+        // the element, so this also covers initialization.
+        queueMicrotask(() => this.reconcile("frame"));
+
+        if (c === null) { return; }
 
         {
             let computed_width1 = parseFloat(getComputedStyle(c).width);
@@ -224,16 +235,6 @@ export class Rez {
                 call_handler(() => on_left_mouse_up?.(mouse_pos));
             }
         }, { signal: this.unsubscribe.signal });
-
-        // anchor: R0OI8LKK
-        // This reconcile releases hover held against the old canvas, if any. It must not
-        // paint yet: rAF callbacks fire before ResizeObserver callbacks, so painting from
-        // a rAF now would use a size that is still unknown. The width === 0 guards in
-        // request_repaint() and paint() defer the actual painting to the initial
-        // ResizeObserver callback, which runs after layout with the accurate resolution.
-        // ResizeObserver is guaranteed to trigger once after we started observing the
-        // element, so this also covers initialization.
-        this.reconcile("frame");
     }
 
     /**

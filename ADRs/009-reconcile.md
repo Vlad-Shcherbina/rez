@@ -78,19 +78,24 @@ which is exactly why there is no flicker.
 | input change          | reconcile               | paint                                        |
 |-----------------------|-------------------------|----------------------------------------------|
 | `ui_fn` set           | microtask               | rAF                                          |
-| canvas set            | sync                    | deferred to the initial RO fire (anchor: R0OI8LKK)   |
+| canvas set            | microtask               | deferred to the initial RO fire (anchor: R0OI8LKK)   |
 | resize / dpr (RO)     | sync, in RO callback    | sync, same callback (same frame slot as rAF) |
 | pointer move/down/up  | sync, in event handler  | rAF                                          |
 | pointerleave          | sync, in event handler  | rAF                                          |
 | `PaintState.set`      | — (paint-only input)    | rAF, subscribers only                        |
 
-Why the microtask for `ui_fn`: the setter runs mid-React-commit (from
-`useLayoutEffect`). Reconciling synchronously would fire app handlers — which
-call `setState` — before sibling effects of the same commit have run (e.g.
-before `on_unhover` is reassigned on the next line), and would make the
+Why the microtasks for `ui_fn` and canvas: both setters run mid-React-commit
+(from `useLayoutEffect`). Reconciling synchronously would fire app handlers —
+which call `setState` — before sibling effects of the same commit have run
+(e.g. before `on_unhover` is reassigned on the next line), and would make the
 `ui_fn -> on_hover -> setState -> rerender -> ui_fn` cycle recursive. The
 microtask runs after the commit settles, so each round of that cycle is a
-flat ping-pong, terminated by the app-side equality cutoffs.
+flat ping-pong, terminated by the app-side equality cutoffs. The canvas
+reconcile can only dispatch `on_unhover` — the setter clears the mouse event,
+so there is no zone to hover — but it is the same hazard, and deferring it
+means the falling edge on a canvas swap reaches the freshly assigned
+`on_unhover`, not the stale one. A microtask still runs before the initial
+ResizeObserver fire, so derived values are settled before the first paint.
 
 Why pointer events reconcile synchronously: `on_left_mouse_down/up` must be
 dispatched to a `hovered_zone` computed from the very event being handled
