@@ -40,6 +40,10 @@ export type Zone = {
 
 export type UiFn = (args: { canvas: HTMLCanvasElement, width: number, height: number }) => Zone[];
 
+// Stable identity, so reconcile's "zones changed" comparison stays honest
+// while there is no canvas or no size yet.
+const no_zones: Zone[] = [];
+
 export class Rez {
     #ui_fn: UiFn = () => [];
     #canvas: HTMLCanvasElement | null = null;
@@ -56,10 +60,24 @@ export class Rez {
     private ui_fn_count = 0;
     private paint_count = 0;
 
-    private zones: Zone[] | typeof NOT_COMPUTED = NOT_COMPUTED;
-    private hovered_zone: Zone | null | typeof NOT_COMPUTED = NOT_COMPUTED;
+    // Derived values, refreshed by reconcile() (see ADRs/009-reconcile.md).
+    // Always fresh by the time paint() runs, because every input mutation
+    // reconciles first (microtask before rAF on the ui_fn path).
+    private zones: Zone[] = no_zones;
+    private hovered_zone: Zone | null = null;
     private mouse_pos: { x: number, y: number } | null = null;
+
+    private zones_memo: {
+        ui_fn: UiFn,
+        canvas: HTMLCanvasElement,
+        width: number,
+        height: number,
+        dpr: number,
+        zones: Zone[],
+    } | null = null;
+
     private mouse_event: PointerEvent | null = null;
+    private hover_active = false; // an on_hover has fired and no on_unhover since
 
     private unsubscribe = new AbortController();
 
@@ -75,18 +93,12 @@ export class Rez {
     get ui_fn() { return this.#ui_fn; }
     set ui_fn(f: UiFn) {
         this.#ui_fn = f;
-        this.zones = NOT_COMPUTED;
-        this.hovered_zone = NOT_COMPUTED;
-        this.request_repaint();
-        if (this.#canvas) {
-            queueMicrotask(() => {
-                if (this.mouse_event) {
-                    this.update_mouse_pos(this.mouse_event);
-                } else {
-                    this.clear_mouse_pos();
-                }
-            });
-        }
+        // Deferred: this setter runs mid-React-commit (from useLayoutEffect).
+        // Reconciling synchronously would fire app handlers before sibling effects
+        // of the same commit have run, and would make the
+        // ui_fn -> on_hover -> setState -> rerender -> ui_fn cycle recursive
+        // instead of a flat microtask ping-pong.
+        queueMicrotask(() => this.reconcile("frame"));
     }
 
     get canvas() { return this.#canvas; }
@@ -94,10 +106,22 @@ export class Rez {
         if (this.#canvas === c) { return; }
         this.#canvas = c;
 
+        // Inputs measured against the old canvas are meaningless; size stays zero
+        // until the new ResizeObserver fires (anchor: R0OI8LKK).
+        this.mouse_event = null;
+        this.dpr = 0;
+        this.width = 0;
+        this.height = 0;
+        this.width_pixels = 0;
+        this.height_pixels = 0;
+
         this.unsubscribe.abort();
         this.unsubscribe = new AbortController();
 
-        if (c === null) { return; }
+        if (c === null) {
+            this.reconcile("frame");
+            return;
+        }
 
         {
             let computed_width1 = parseFloat(getComputedStyle(c).width);
@@ -114,7 +138,6 @@ export class Rez {
         }
 
         let obs = new ResizeObserver((entries) => {
-            if (this.log) console.log("resize obs");
             for (let entry of entries) {
                 let dpr = window.devicePixelRatio;
                 let width_pixels;
@@ -141,18 +164,21 @@ export class Rez {
                 // Set the canvas resolution here, not in paint(), so that ui_fn() always
                 // observes the correct canvas.width/height. ui_fn() can run before the first
                 // paint(), e.g. from the pointermove handler (see anchor: R0OI8LKK).
-                c.width = width_pixels;
-                c.height = height_pixels;
+                // Guarded because assigning width/height clears the bitmap even when the
+                // value is unchanged, and the initial callback after observe() can deliver
+                // an unchanged size (e.g. a reattach of the same canvas); skipping the
+                // assignment keeps the pixels valid, so reconcile correctly derives
+                // "nothing to repaint".
+                if (c.width !== width_pixels) c.width = width_pixels;
+                if (c.height !== height_pixels) c.height = height_pixels;
 
                 if (this.log) console.log("resize obs", { dpr, width_pixels, height_pixels, width, height });
 
-                this.zones = NOT_COMPUTED;
-                this.hovered_zone = NOT_COMPUTED;
-
-                // Paint synchronously here rather than in rAF to avoid flicker,
-                // because we just changed canvas resolution and cleared it.
-                this.repaint_needed = true;
-                this.paint();
+                // Paint synchronously ("now") rather than in rAF to avoid flicker:
+                // the resolution change cleared the canvas, and this callback runs in
+                // the frame's rendering steps (the same slot as rAF), before the frame
+                // is presented.
+                this.reconcile("now");
             }
         });
 
@@ -164,136 +190,132 @@ export class Rez {
         }
         this.unsubscribe.signal.addEventListener("abort", () => obs.disconnect(), { once: true });
 
-        c.addEventListener("pointerleave", (e) => {
-            this.mouse_pos = null;
+        c.addEventListener("pointerleave", () => {
             this.mouse_event = null;
-
-            if (this.hovered_zone !== null) {
-                this.hovered_zone = null;
-                this.repaint_needed = true;
-                call_handler(() => this.on_unhover());
-            }
-
-            if (this.repaint_needed) {
-                this.request_repaint();
-            }
+            this.reconcile("frame");
         }, { signal: this.unsubscribe.signal });
 
         c.addEventListener("pointermove", (e) => {
-            this.update_mouse_pos(e);
+            this.mouse_event = e;
+            this.reconcile("frame");
         }, { signal: this.unsubscribe.signal });
 
         c.addEventListener("pointerdown", (e) => {
             c.setPointerCapture(e.pointerId);
-            let { mouse_pos, hovered_zone } = this.update_mouse_pos(e);
+            this.mouse_event = e;
+            // Sync reconcile, so the dispatch below sees a hovered_zone computed from
+            // this very event (the pointer may have moved since the last pointermove).
+            // Consequence: on_hover fires before on_left_mouse_down.
+            this.reconcile("frame");
             if (e.button === 0) {
-                call_handler(() => {
-                    hovered_zone?.on_left_mouse_down?.(mouse_pos);
-                });
+                let on_left_mouse_down = this.hovered_zone?.on_left_mouse_down;
+                let mouse_pos = bang(this.mouse_pos);
+                call_handler(() => on_left_mouse_down?.(mouse_pos));
             }
         }, { signal: this.unsubscribe.signal });
 
         c.addEventListener("pointerup", (e) => {
             c.releasePointerCapture(e.pointerId);
-            let { mouse_pos, hovered_zone } = this.update_mouse_pos(e);
+            this.mouse_event = e;
+            this.reconcile("frame");
             if (e.button === 0) {
-                call_handler(() => {
-                    hovered_zone?.on_left_mouse_up?.(mouse_pos);
-                });
+                let on_left_mouse_up = this.hovered_zone?.on_left_mouse_up;
+                let mouse_pos = bang(this.mouse_pos);
+                call_handler(() => on_left_mouse_up?.(mouse_pos));
             }
         }, { signal: this.unsubscribe.signal });
 
         // anchor: R0OI8LKK
-        // We don't request repaint here, because rAF fires before ResizeObserver, so we'd be painting with wrong resolution.
-        // Instead, we paint from the ResizeObserver callback, which runs after layout with the accurate resolution.
-        // ResizeObserver is guaranteed to trigger once after we started observing the element, so this works for initialization.
+        // This reconcile releases hover held against the old canvas, if any. It must not
+        // paint yet: rAF callbacks fire before ResizeObserver callbacks, so painting from
+        // a rAF now would use a size that is still unknown. The width === 0 guards in
+        // request_repaint() and paint() defer the actual painting to the initial
+        // ResizeObserver callback, which runs after layout with the accurate resolution.
+        // ResizeObserver is guaranteed to trigger once after we started observing the
+        // element, so this also covers initialization.
+        this.reconcile("frame");
     }
 
-    private clear_mouse_pos() {
-        assert(!!this.#canvas);
-
-        this.mouse_pos = null;
-        this.mouse_event = null;
-
-        if (this.hovered_zone !== null) {
-            this.hovered_zone = null;
-            call_handler(() => this.on_unhover());
-            this.request_repaint();
-        }
-
-        this.#canvas.style.cursor = "default";
-    }
-
-    private update_mouse_pos(e: PointerEvent) {
-        assert(!!this.#canvas);
-
-        let coords = pointer_event_to_canvas_coords(e, this.#canvas);
-        this.mouse_pos = coords;
-        this.mouse_event = e;
-
+    /**
+     * The single choke point: every input mutation (ui_fn, canvas, size, mouse event)
+     * is followed by exactly one reconcile() call, which refreshes the derived values
+     * and decides all reactions (handlers, cursor, repaint). See ADRs/009-reconcile.md.
+     *
+     * "now" paints synchronously; only for the resize path, where the canvas was just
+     * cleared and we are already in the frame's rendering steps.
+     */
+    private reconcile(paint_timing: "frame" | "now") {
+        let prev_zones = this.zones;
         let prev_hovered_zone = this.hovered_zone;
-        this.hovered_zone = NOT_COMPUTED;
-        let hovered_zone = this.get_hovered_zone();
-        if (prev_hovered_zone !== hovered_zone) {
-            this.request_repaint();
+
+        this.zones = this.get_zones();
+        this.mouse_pos = this.mouse_event === null ? null
+            : pointer_event_to_canvas_coords(this.mouse_event, bang(this.#canvas));
+        this.hovered_zone = hit_test(this.zones, this.mouse_pos);
+
+        // Repaint iff something paint() reads has changed
+        // (PaintState.set has its own subscription path).
+        if (this.zones !== prev_zones || this.hovered_zone !== prev_hovered_zone) {
+            this.repaint_needed = true;
         }
-        let on_hover = hovered_zone?.on_hover;
 
-        call_handler(() => {
-            if (on_hover) {
-                let { x, y } = coords;
-                on_hover({ x, y, event: e });
+        // on_hover is a level handler: it fires on every reconcile while the mouse is
+        // over a zone that has it (apps rely on this for live coordinates, and it makes
+        // hover state path-independent across ui_fn changes; see Zone.on_hover).
+        // on_unhover is a transition handler: it fires once, on the falling edge of
+        // "an on_hover has been dispatched", and never while the mouse is elsewhere,
+        // so it can't clobber a tooltip that meanwhile belongs to another element.
+        let event = this.mouse_event;
+        let on_hover = this.hovered_zone?.on_hover;
+        if (event !== null && on_hover !== undefined) {
+            let { x, y } = bang(this.mouse_pos);
+            call_handler(() => on_hover({ x, y, event }));
+            this.hover_active = true;
+        } else if (this.hover_active) {
+            this.hover_active = false;
+            call_handler(() => this.on_unhover());
+        }
+
+        if (this.#canvas !== null) {
+            this.#canvas.style.cursor = this.hovered_zone?.cursor || "default";
+        }
+
+        if (this.repaint_needed) {
+            if (paint_timing === "now") {
+                this.paint();
             } else {
-                this.on_unhover();
+                this.request_repaint();
             }
-        });
-
-        this.#canvas.style.cursor = hovered_zone?.cursor || "default";
-        return { mouse_pos: this.mouse_pos, hovered_zone };
+        }
     }
 
     private get_zones(): Zone[] {
-        if (this.zones !== NOT_COMPUTED) return this.zones;
-        if (!this.#canvas) return [];
-
         // anchor: R0OI8LKK
-        // Without this check, if we move mouse over the canvas right when it's being attached to rez,
-        // mouse move handler will trigger before resize observer, and we'll call ui_fn()
-        // with uninitialized width and height.
-        if (this.width === 0) return [];
+        // ui_fn() is never fed a dummy size: before the initial ResizeObserver fire
+        // (e.g. a pointermove right as the canvas is attached), there are no zones.
+        if (this.#canvas === null || this.width === 0) return no_zones;
+
+        // Identity memo; the key is the complete set of inputs ui_fn() can observe
+        // (dpr because canvas.width = width * dpr, anchor: XQOEPuOg).
+        // No invalidation calls anywhere: staleness is checked here, at the point of use.
+        let m = this.zones_memo;
+        if (m !== null
+            && m.ui_fn === this.#ui_fn
+            && m.canvas === this.#canvas
+            && m.width === this.width
+            && m.height === this.height
+            && m.dpr === this.dpr
+        ) {
+            return m.zones;
+        }
 
         if (this.log) console.time("ui_fn");
         this.ui_fn_count += 1;
         let zones = this.#ui_fn({ canvas: this.#canvas, width: this.width, height: this.height });
         if (this.log) console.timeEnd("ui_fn");
         zones.sort((a, b) => a.priority - b.priority);
-        this.zones = zones;
-        return this.zones;
-    }
-
-    private get_hovered_zone(): Zone | null {
-        if (this.hovered_zone !== NOT_COMPUTED) return this.hovered_zone;
-        if (this.mouse_pos === null) {
-            this.hovered_zone = null;
-            return this.hovered_zone;
-        }
-        let zones = this.get_zones();
-
-        let best: Zone | null = null;
-        let dist = Infinity;
-        for (let i = zones.length - 1; i >= 0; i--) {
-            let zone = zones[i];
-            if (best && zone.priority < best.priority) break;
-            assert(!best || best.priority === zone.priority); // because zones are sorted
-            if (!zone.sdf) continue;
-            let d = zone.sdf(this.mouse_pos.x, this.mouse_pos.y);
-            if (d < 0 && d < dist) {
-                dist = d;
-                best = zone;
-            }
-        }
-        this.hovered_zone = best;
-        return this.hovered_zone;
+        this.zones_memo = { ui_fn: this.#ui_fn, canvas: this.#canvas, width: this.width, height: this.height, dpr: this.dpr, zones };
+        return zones;
     }
 
     request_repaint() {
@@ -315,15 +337,19 @@ export class Rez {
 
     private paint() {
         if (this.#canvas === null) return;
+        // A rAF scheduled before a canvas swap can fire while the new size is still
+        // unknown (rAF callbacks run before ResizeObserver callbacks). Keep
+        // repaint_needed set and let the initial ResizeObserver fire paint instead
+        // (anchor: R0OI8LKK).
+        if (this.width === 0) return;
         if (!this.repaint_needed) return;
         this.repaint_needed = false;
 
-        let zones = this.get_zones();
-        let hovered_zone = this.get_hovered_zone();
+        let zones = this.zones;
+        let hovered_zone = this.hovered_zone;
 
         if (this.log) console.time("rez.paint()");
         let canvas = this.#canvas;
-        assert(this.width > 0);
         let ctx = bang(canvas.getContext("2d"));
         ctx.setTransform(1, 0, 0, 1, 0, 0);
         ctx.clearRect(0, 0, canvas.width, canvas.height);
@@ -354,6 +380,25 @@ export class Rez {
     }
 }
 
+function hit_test(zones: Zone[], mouse_pos: { x: number, y: number } | null): Zone | null {
+    if (mouse_pos === null) return null;
+
+    let best: Zone | null = null;
+    let dist = Infinity;
+    for (let i = zones.length - 1; i >= 0; i--) {
+        let zone = zones[i];
+        if (best && zone.priority < best.priority) break;
+        assert(!best || best.priority === zone.priority); // because zones are sorted
+        if (!zone.sdf) continue;
+        let d = zone.sdf(mouse_pos.x, mouse_pos.y);
+        if (d < 0 && d < dist) {
+            dist = d;
+            best = zone;
+        }
+    }
+    return best;
+}
+
 export function pointer_event_to_canvas_coords(e: PointerEvent | WheelEvent, canvas?: HTMLCanvasElement) {
     // currentTarget is only set while we are inside the event handler.
     // If we save the event for later, this field gets cleared.
@@ -370,8 +415,6 @@ export function pointer_event_to_canvas_coords(e: PointerEvent | WheelEvent, can
         y: e.offsetY * canvas.height / (rect.height * dpr),
     };
 }
-
-const NOT_COMPUTED: unique symbol = Symbol('NOT_COMPUTED');
 
 export class PaintState<T> {
     #value: T;
