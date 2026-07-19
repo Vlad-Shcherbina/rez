@@ -25,6 +25,9 @@ State:
   See [../ADRs/007-paint-state.md]. anchor: spqEMBfi
 - **Drag to pan** — committed/transient state split, catch-all overlay,
   global `ctx.translate` trick. See [../ADRs/006-drag-hack.md]. anchor: yFg3E1rq
+- **Orthogonal hover aspects** — zones drive different subsets of hover state
+  (tooltip, status bar, readouts); funnel every `on_hover` through one `apply_hover(partial)`
+  that spreads the partial over defaults, so unmentioned aspects reset automatically. anchor: D76Qq7ZS
 
 Misc:
 

@@ -6,3 +6,4 @@ So in `on_hover` you can call `set_tooltip()`, in `on_unhover()` call `clear_too
 But it becomes inelegant if we have two orthogonal aspects of state that should change on hover (tooltips and something else),
 only some of the zones have one aspect or the other.
 Because we can't automatically enforce "when zone's `on_hover` doesn't call `set_tooltip()`, call `clear_tooltip()`".
+This is solved by the hover state pattern (anchor: D76Qq7ZS).
