@@ -2,7 +2,7 @@ import "../offensive";
 import { assert, bang } from "../assert";
 import { createRoot } from "react-dom/client";
 import { UiFn, Zone } from "../rez";
-import { make_circle_sdf } from "../sdfs";
+import { make_circle_sdf, make_segment_sdf } from "../sdfs";
 import { useTooltip } from "../tooltip";
 import { StrictMode, useLayoutEffect, useRef, useState } from "react";
 import { usePaintState, useRez } from "../rerez";
@@ -116,6 +116,25 @@ function App() {
                 ctx.arc(x, y, r, 0, Math.PI * 2);
                 ctx.stroke();
             }
+        });
+
+        let [sx1, sy1, sx2, sy2] = [70, 300, 220, 350];
+        let seg_thickness = 10;
+        zones.push({
+            priority: 0,
+            sdf: make_segment_sdf(sx1, sy1, sx2, sy2, seg_thickness),
+            paint: ({hovered}) => {
+                ctx.strokeStyle = hovered ? "black" : "gray";
+                ctx.lineWidth = seg_thickness;
+                ctx.lineCap = "round";
+                ctx.beginPath();
+                ctx.moveTo(sx1, sy1);
+                ctx.lineTo(sx2, sy2);
+                ctx.stroke();
+            },
+            on_hover: ({event}) => {
+                set_tooltip(<>Segment SDF</>, event);
+            },
         });
 
         return zones;

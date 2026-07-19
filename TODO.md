@@ -1,5 +1,3 @@
-* SDFs
-  - line
 * Separate handlers for mouse_click and mouse_down
   (also use threshold for begin_drag)
 * demos
