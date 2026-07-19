@@ -310,11 +310,6 @@ export class Rez {
     request_repaint() {
         this.repaint_needed = true;
 
-        if (this.measured === null || this.measured.width === 0) {
-            // We don't schedule repaint right away, and instead rely on ResizeObserver to repaint
-            return;
-        }
-
         if (!this.af_requested) {
             this.af_requested = true;
             requestAnimationFrame(() => {
