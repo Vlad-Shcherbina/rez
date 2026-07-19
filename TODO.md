@@ -3,7 +3,6 @@
 * demos
   - chessboard
   - drag with sticking
-  - brush
 * CI and GitHub Pages
 * docs
   - overview

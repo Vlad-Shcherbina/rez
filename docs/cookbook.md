@@ -28,6 +28,9 @@ State:
 - **Orthogonal hover aspects** — zones drive different subsets of hover state
   (tooltip, status bar, readouts); funnel every `on_hover` through one `apply_hover(partial)`
   that spreads the partial over defaults, so unmentioned aspects reset automatically. anchor: D76Qq7ZS
+- **Path-dependent brush (drag to apply a tool)** — buttons only set a mode;
+  the level-triggered `on_hover` applies the tool at the current cell, so a click is
+  a zero-length drag; idempotent updates make the intentional re-dispatch safe. anchor: 5ZKcK8LO
 
 Misc:
 
