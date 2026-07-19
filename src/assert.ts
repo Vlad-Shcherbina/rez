@@ -1,8 +1,7 @@
 export function assert(cond: boolean, message?: string): asserts cond {
     if (!cond) {
-        console.assert(cond, message || "assert failed");
-        console.trace();
-        throw message || "assert failed";
+        console.trace(message || "assert failed");
+        throw new Error(message || "assert failed");
     }
 }
 
@@ -32,3 +31,16 @@ export function bang<T>(x: T): NonNullable<T> {
 // because TypeScript doesn't support combining `asserts` and return types:
 // https://github.com/microsoft/TypeScript/issues/40562
 // So the return value will be narrowed, but the original argument won't be.
+
+/**
+ * Use for exhaustive destructuring:
+ * ```
+ * let { field1, field2, ...rest } = my_object;
+ * assert_keyless(rest);
+ * ```
+ */
+export function assert_keyless<T extends object>(
+  obj: [keyof T] extends [never] ? T : "should have no keys"
+) {
+    assert(Reflect.ownKeys(obj as object).length === 0, JSON.stringify(obj));
+}
