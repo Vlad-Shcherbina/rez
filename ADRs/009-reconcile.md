@@ -27,8 +27,11 @@ Setting the canvas resets `measured` to `null` (a stale size must not feed
 
 Initialization is the same story as any other input change: `measured` starts
 at `null` and the mouse event at `null`; `ui_fn` is never called while
-unmeasured (or while the size is genuinely zero), and the guaranteed initial
-ResizeObserver fire supplies the real size.
+unmeasured (or while the size is genuinely zero), and the initial
+ResizeObserver fire supplies the real size. That fire only happens once the
+canvas is rendered with a nonzero size — until then there is nothing to paint
+anyway, and the canvas-set reconcile (a microtask, not the ResizeObserver)
+is what settles hover and derived state in the meantime.
 
 ## Derived values
 
