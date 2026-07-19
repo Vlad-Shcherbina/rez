@@ -1,13 +1,10 @@
-* hover details
 * Right mouse button (and suppress context menu)
 * SDFs
-  - rect
   - line
 * Separate handlers for mouse_click and mouse_down
   (also use threshold for begin_drag)
 * demos
   - chessboard
-  - pan & zoom
   - drag with sticking
   - brush
 * CI and GitHub Pages
