@@ -198,8 +198,7 @@ export class Rez {
         }, { signal: this.unsubscribe.signal });
 
         c.addEventListener("pointermove", (e) => {
-            this.mouse_event = e;
-            this.reconcile("frame");
+            this.handle_pointer_event(e);
         }, { signal: this.unsubscribe.signal });
 
         c.addEventListener("contextmenu", (e) => {
@@ -208,36 +207,40 @@ export class Rez {
 
         c.addEventListener("pointerdown", (e) => {
             c.setPointerCapture(e.pointerId);
-            this.mouse_event = e;
-            // Sync reconcile, so the dispatch below sees a hovered_zone computed from
-            // this very event (the pointer may have moved since the last pointermove).
-            // Consequence: on_hover fires before the mouse-down handler.
-            this.reconcile("frame");
-            if (e.button === 0) {
-                let on_left_mouse_down = this.hovered_zone?.on_left_mouse_down;
-                let mouse_pos = bang(this.mouse_pos);
-                call_handler(() => on_left_mouse_down?.(mouse_pos));
-            } else if (e.button === 2) {
-                let on_right_mouse_down = this.hovered_zone?.on_right_mouse_down;
-                let mouse_pos = bang(this.mouse_pos);
-                call_handler(() => on_right_mouse_down?.(mouse_pos));
-            }
+            this.handle_pointer_event(e);
         }, { signal: this.unsubscribe.signal });
 
         c.addEventListener("pointerup", (e) => {
             c.releasePointerCapture(e.pointerId);
-            this.mouse_event = e;
-            this.reconcile("frame");
-            if (e.button === 0) {
-                let on_left_mouse_up = this.hovered_zone?.on_left_mouse_up;
-                let mouse_pos = bang(this.mouse_pos);
-                call_handler(() => on_left_mouse_up?.(mouse_pos));
-            } else if (e.button === 2) {
-                let on_right_mouse_up = this.hovered_zone?.on_right_mouse_up;
-                let mouse_pos = bang(this.mouse_pos);
-                call_handler(() => on_right_mouse_up?.(mouse_pos));
-            }
+            this.handle_pointer_event(e);
         }, { signal: this.unsubscribe.signal });
+    }
+
+    private handle_pointer_event(e: PointerEvent) {
+        this.mouse_event = e;
+        // Sync reconcile, so the dispatch below sees a hovered_zone computed from
+        // this very event (the pointer may have moved since the last pointermove).
+        // Consequence: on_hover fires before the mouse-button handler.
+        this.reconcile("frame");
+
+        // pointerdown/pointerup only fire for the first press and final release.
+        // Changes to chorded buttons arrive as pointermove with button identifying
+        // the changed button and buttons containing the state after the change.
+        let handler: Zone["on_left_mouse_down"];
+        if (e.button === 0) {
+            handler = (e.buttons & 1) !== 0
+                ? this.hovered_zone?.on_left_mouse_down
+                : this.hovered_zone?.on_left_mouse_up;
+        } else if (e.button === 2) {
+            handler = (e.buttons & 2) !== 0
+                ? this.hovered_zone?.on_right_mouse_down
+                : this.hovered_zone?.on_right_mouse_up;
+        } else {
+            return;
+        }
+
+        let mouse_pos = bang(this.mouse_pos);
+        call_handler(() => handler?.(mouse_pos));
     }
 
     /**
