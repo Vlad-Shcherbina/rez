@@ -20,6 +20,8 @@ export type Zone = {
     }) => void,
     on_left_mouse_down?: (args: { x: number, y: number }) => void,
     on_left_mouse_up?: (args: { x: number, y: number }) => void,
+    on_right_mouse_down?: (args: { x: number, y: number }) => void,
+    on_right_mouse_up?: (args: { x: number, y: number }) => void,
 
     /**
      * `on_hover` is called when mouse moves over the zone,
@@ -200,17 +202,25 @@ export class Rez {
             this.reconcile("frame");
         }, { signal: this.unsubscribe.signal });
 
+        c.addEventListener("contextmenu", (e) => {
+            e.preventDefault();
+        }, { signal: this.unsubscribe.signal });
+
         c.addEventListener("pointerdown", (e) => {
             c.setPointerCapture(e.pointerId);
             this.mouse_event = e;
             // Sync reconcile, so the dispatch below sees a hovered_zone computed from
             // this very event (the pointer may have moved since the last pointermove).
-            // Consequence: on_hover fires before on_left_mouse_down.
+            // Consequence: on_hover fires before the mouse-down handler.
             this.reconcile("frame");
             if (e.button === 0) {
                 let on_left_mouse_down = this.hovered_zone?.on_left_mouse_down;
                 let mouse_pos = bang(this.mouse_pos);
                 call_handler(() => on_left_mouse_down?.(mouse_pos));
+            } else if (e.button === 2) {
+                let on_right_mouse_down = this.hovered_zone?.on_right_mouse_down;
+                let mouse_pos = bang(this.mouse_pos);
+                call_handler(() => on_right_mouse_down?.(mouse_pos));
             }
         }, { signal: this.unsubscribe.signal });
 
@@ -222,6 +232,10 @@ export class Rez {
                 let on_left_mouse_up = this.hovered_zone?.on_left_mouse_up;
                 let mouse_pos = bang(this.mouse_pos);
                 call_handler(() => on_left_mouse_up?.(mouse_pos));
+            } else if (e.button === 2) {
+                let on_right_mouse_up = this.hovered_zone?.on_right_mouse_up;
+                let mouse_pos = bang(this.mouse_pos);
+                call_handler(() => on_right_mouse_up?.(mouse_pos));
             }
         }, { signal: this.unsubscribe.signal });
     }

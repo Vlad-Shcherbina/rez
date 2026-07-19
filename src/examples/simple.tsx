@@ -13,6 +13,7 @@ function App() {
     rez.log = true;
 
     let [toggled, set_toggled] = useState([true, false, false]);
+    let [right_mouse_down, set_right_mouse_down] = useState(false);
 
     let { set_tooltip, clear_tooltip } = useTooltip();
 
@@ -54,7 +55,7 @@ function App() {
                 // Hover effect: restyle based on the `hovered` flag. anchor: 31ImAttW
                 paint: ({hovered}) => {
                     ctx.fillStyle = toggled[i] ? "green" : "yellow";
-                    ctx.strokeStyle = hovered ? "black" : "gray";
+                    ctx.strokeStyle = right_mouse_down && hovered ? "red" : hovered ? "black" : "gray";
                     ctx.lineWidth = hovered ? 2 : 1;
                     ctx.beginPath();
                     ctx.arc(x, y, r, 0, Math.PI * 2);
@@ -77,6 +78,12 @@ function App() {
                 on_left_mouse_down: () => {
                     toggled[i] = !toggled[i];
                     set_toggled([...toggled]);
+                },
+                on_right_mouse_down: () => {
+                    set_right_mouse_down(true);
+                },
+                on_right_mouse_up: () => {
+                    set_right_mouse_down(false);
                 },
             })
         });
@@ -125,6 +132,7 @@ function App() {
 
     return <>
         <h3>Simple example</h3>
+        <p>Left-click a circle to toggle it; right-click and hold to see the right mouse handlers.</p>
         <canvas ref={canvas_ref} style={{width: "400px", height: "400px", border: "1px solid black"}} />
     </>
 }

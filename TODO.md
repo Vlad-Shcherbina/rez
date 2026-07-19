@@ -1,4 +1,3 @@
-* Right mouse button (and suppress context menu)
 * SDFs
   - line
 * Separate handlers for mouse_click and mouse_down
