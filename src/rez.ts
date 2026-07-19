@@ -51,11 +51,7 @@ export class Rez {
     private repaint_needed: boolean = false;
     private af_requested: boolean = false; // af - animation frame
 
-    private dpr = 0;
-    private width = 0;
-    private height = 0;
-    private width_pixels = 0;
-    private height_pixels = 0;
+    private measured: { dpr: number, width: number, height: number } | null = null;  // owned by RO
 
     private ui_fn_count = 0;
     private paint_count = 0;
@@ -113,14 +109,9 @@ export class Rez {
         if (this.#canvas === c) { return; }
         this.#canvas = c;
 
-        // Inputs measured against the old canvas are meaningless; size stays zero
-        // until the new ResizeObserver fires (anchor: R0OI8LKK).
+        // Inputs measured against the old canvas are meaningless.
         this.mouse_event = null;
-        this.dpr = 0;
-        this.width = 0;
-        this.height = 0;
-        this.width_pixels = 0;
-        this.height_pixels = 0;
+        this.measured = null;
 
         this.unsubscribe.abort();
         this.unsubscribe = new AbortController();
@@ -131,11 +122,10 @@ export class Rez {
         // means that falling edge reaches the on_unhover assigned in the same
         // commit, not the stale one.
         //
-        // anchor: R0OI8LKK
         // It must not paint yet: the new size is unknown until the initial
         // ResizeObserver callback, which runs after layout with the accurate
         // resolution (rAF callbacks fire before ResizeObserver callbacks, so even a
-        // rAF-scheduled paint would be too early). The width === 0 guards in
+        // rAF-scheduled paint would be too early). The measured === null guards in
         // request_repaint() and paint() defer the actual painting to that callback.
         // ResizeObserver is guaranteed to trigger once after we started observing
         // the element, so this also covers initialization.
@@ -175,24 +165,15 @@ export class Rez {
                 let height = height_pixels / dpr;
 
                 // pointer_event_to_canvas_coords() relies on this, anchor: XQOEPuOg
-                this.dpr = dpr;
-                this.width_pixels = width_pixels;
-                this.height_pixels = height_pixels;
-                this.width = width;
-                this.height = height;
+                this.measured = { dpr, width, height };
 
                 // Set the canvas resolution here, not in paint(), so that ui_fn() always
                 // observes the correct canvas.width/height. ui_fn() can run before the first
-                // paint(), e.g. from the pointermove handler (see anchor: R0OI8LKK).
+                // paint(), e.g. from the pointermove handler.
                 // Guarded because assigning width/height clears the bitmap even when the
                 // value is unchanged. That matters when this callback fires with the
                 // rounded pixel size unchanged and reconcile derives "nothing to repaint"
                 // (zones memo hit): an unconditional assignment would blank the canvas.
-                // Reachable via the content-box fallback, where a fractional CSS resize
-                // can round to the same pixel size. (The initial fire after observe() can
-                // also deliver an unchanged size — e.g. reattaching the same canvas — but
-                // that case is safe either way: zones were reset on attach, so reconcile
-                // repaints below.)
                 if (c.width !== width_pixels) c.width = width_pixels;
                 if (c.height !== height_pixels) c.height = height_pixels;
 
@@ -306,10 +287,8 @@ export class Rez {
     }
 
     private get_zones(): Zone[] {
-        // anchor: R0OI8LKK
-        // ui_fn() is never fed a dummy size: before the initial ResizeObserver fire
-        // (e.g. a pointermove right as the canvas is attached), there are no zones.
-        if (this.#canvas === null || this.width === 0) return no_zones;
+        let measured = this.measured;
+        if (this.#canvas === null || measured === null || measured.width === 0) return no_zones;
 
         // Identity memo; the key is the complete set of inputs ui_fn() can observe
         // (dpr because canvas.width = width * dpr, anchor: XQOEPuOg).
@@ -318,27 +297,27 @@ export class Rez {
         if (m !== null
             && m.ui_fn === this.#ui_fn
             && m.canvas === this.#canvas
-            && m.width === this.width
-            && m.height === this.height
-            && m.dpr === this.dpr
+            && m.width === measured.width
+            && m.height === measured.height
+            && m.dpr === measured.dpr
         ) {
             return m.zones;
         }
 
         if (this.log) console.time("ui_fn");
         this.ui_fn_count += 1;
-        let zones = this.#ui_fn({ canvas: this.#canvas, width: this.width, height: this.height });
+        let zones = this.#ui_fn({ canvas: this.#canvas, width: measured.width, height: measured.height });
         if (this.log) console.timeEnd("ui_fn");
         zones.sort((a, b) => a.priority - b.priority);
-        this.zones_memo = { ui_fn: this.#ui_fn, canvas: this.#canvas, width: this.width, height: this.height, dpr: this.dpr, zones };
+        this.zones_memo = { ui_fn: this.#ui_fn, canvas: this.#canvas, width: measured.width, height: measured.height, dpr: measured.dpr, zones };
         return zones;
     }
 
     request_repaint() {
         this.repaint_needed = true;
 
-        if (this.width === 0) {
-            // We don't schedule repaint right away, and instead rely on ResizeObserver to repaint (see anchor: R0OI8LKK)
+        if (this.measured === null || this.measured.width === 0) {
+            // We don't schedule repaint right away, and instead rely on ResizeObserver to repaint
             return;
         }
 
@@ -353,11 +332,8 @@ export class Rez {
 
     private paint() {
         if (this.#canvas === null) return;
-        // A rAF scheduled before a canvas swap can fire while the new size is still
-        // unknown (rAF callbacks run before ResizeObserver callbacks). Keep
-        // repaint_needed set and let the initial ResizeObserver fire paint instead
-        // (anchor: R0OI8LKK).
-        if (this.width === 0) return;
+        let measured = this.measured;
+        if (measured === null || measured.width === 0) return;
         if (!this.repaint_needed) return;
         this.repaint_needed = false;
 
@@ -369,7 +345,7 @@ export class Rez {
         let ctx = bang(canvas.getContext("2d"));
         ctx.setTransform(1, 0, 0, 1, 0, 0);
         ctx.clearRect(0, 0, canvas.width, canvas.height);
-        ctx.scale(this.dpr, this.dpr);
+        ctx.scale(measured.dpr, measured.dpr);
 
         for (let ps of this.paint_states) {
             let had = ps.subscribers.delete(this);

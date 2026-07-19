@@ -13,21 +13,22 @@ it would have to opt out explicitly.
 
 - `ui_fn`
 - canvas identity (attach / detach / swap)
-- canvas size: `width`, `height`, `dpr` (owned by the ResizeObserver)
+- canvas size: `measured = {width, height, dpr}` (owned by the ResizeObserver;
+  `null` while unmeasured)
 - last raw mouse event (`null` while the mouse is not over the canvas)
 
 Paint states are a fifth input, but only `paint()` depends on them; they keep
 their own subscription mechanism (see [./007-paint-state.md]) and stay outside
 this scheme.
 
-Setting the canvas resets size to zero (a stale size must not feed `ui_fn`
-before the new ResizeObserver fires) and clears the mouse event (an `offsetX`
-measured against the old canvas is meaningless).
+Setting the canvas resets `measured` to `null` (a stale size must not feed
+`ui_fn` before the new ResizeObserver fires) and clears the mouse event (an
+`offsetX` measured against the old canvas is meaningless).
 
-Initialization is the same story as any other input change: size starts at
-zero and the mouse event at `null`; `ui_fn` is never called while size is
-zero, and the guaranteed initial ResizeObserver fire supplies the real size
-(anchor: R0OI8LKK).
+Initialization is the same story as any other input change: `measured` starts
+at `null` and the mouse event at `null`; `ui_fn` is never called while
+unmeasured (or while the size is genuinely zero), and the guaranteed initial
+ResizeObserver fire supplies the real size.
 
 ## Derived values
 
@@ -68,7 +69,7 @@ as rAF (why painting there is what avoids flicker: anchor: IJ5uYVqh).
 | input change          | reconcile               | paint                                        |
 |-----------------------|-------------------------|----------------------------------------------|
 | `ui_fn` set           | microtask               | rAF                                          |
-| canvas set            | microtask               | deferred to the initial RO fire (anchor: R0OI8LKK)   |
+| canvas set            | microtask               | deferred to the initial RO fire              |
 | resize / dpr (RO)     | sync, in RO callback    | sync, same callback (same frame slot as rAF) |
 | pointer move/down/up  | sync, in event handler  | rAF                                          |
 | pointerleave          | sync, in event handler  | rAF                                          |
