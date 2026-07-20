@@ -22,5 +22,6 @@ export function usePaintState<T>(f: () => T) {
     let get_ps = () => ps.get();
     let set_ps = (value: T) => ps.set(value);
     // TODO: maybe allow passing old->new function?
+    // TODO: maybe return stable get_ps and set_ps to allow memoization downstream
     return [get_ps, set_ps] as const;
 }

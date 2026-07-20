@@ -25,6 +25,7 @@ const CELL_SIZE = 10;
 function App() {
     let canvas_ref = useRef<HTMLCanvasElement>(null);
     let rez = useRez(canvas_ref);
+    rez.log = true;
 
     let [get_xy, set_xy] = usePaintState<{ x: number, y: number } | null>(() => null);
     let [left_pressed, set_left_pressed] = useState(false);
@@ -56,7 +57,8 @@ function App() {
                 if (xy === null || xy.x !== cell_x || xy.y !== cell_y) {
                     set_xy({ x: cell_x, y: cell_y });
                 }
-
+                // Note: could be out of bounds because of pointer capture.
+                // The application should handle this (in this example we don't care).
                 let key = `${cell_x},${cell_y}`;
                 if (right_pressed) {
                     set_painted_cells(old_cells => {

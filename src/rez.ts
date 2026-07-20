@@ -89,7 +89,7 @@ export class Rez {
      */
     on_unhover: () => void = () => {};
 
-    log: boolean = true;
+    log: boolean = false;
 
     constructor() {}
 

@@ -21,6 +21,7 @@ function App() {
 
     let ui_fn: UiFn = ({canvas, width, height}) => {
         assert(canvas.width % 400 === 0, `${canvas.width} ${canvas.height}`); // % to allow for DPI factor
+        // TODO: doesn't work for fractional DPI such as 150%
 
         let zones: Zone[] = [];
         let ctx = bang(canvas.getContext("2d"));
