@@ -39,7 +39,7 @@ is what settles hover and derived state in the meantime.
   Cached behind an identity memo whose key is the complete set of inputs
   `ui_fn` can observe: `(ui_fn, canvas, width, height, dpr)`. `dpr` is in the
   key because `ui_fn` can read `canvas.width`, which is `width * dpr`
-  (anchor: XQOEPuOg). There are no invalidation calls anywhere — staleness is
+  There are no invalidation calls anywhere — staleness is
   checked at the point of use, so a new route for mutating an existing input
   cannot forget to invalidate. A genuinely new dependency requires extending
   the key: one declared list, in one place, next to the `ui_fn` call.

@@ -221,8 +221,8 @@ function App() {
         let canvas = bang(canvas_ref.current);
         let on_wheel = (e: WheelEvent) => {
             e.preventDefault();
-            // Read coords eagerly: the functional updater below runs later (next
-            // render), by which point e.currentTarget is cleared. (anchor: XQOEPuOg)
+            // Read coords eagerly: the functional updater below runs later (next render),
+            // by which point e.currentTarget is cleared.
             let { x, y } = pointer_event_to_canvas_coords(e, canvas);
             let factor = wheel_zoom_factor(e);
             set_zoom(old => old === null ? old : zoom_around(old, x, y, factor));

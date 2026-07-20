@@ -160,8 +160,6 @@ export class Rez {
                 }
                 let width = width_pixels / dpr;
                 let height = height_pixels / dpr;
-
-                // pointer_event_to_canvas_coords() relies on this, anchor: XQOEPuOg
                 this.measured = { dpr, width, height };
 
                 // Set the canvas resolution here, not in paint(), so that ui_fn() always
@@ -309,7 +307,7 @@ export class Rez {
         if (this.#canvas === null || measured === null || measured.width === 0 || measured.height === 0) return no_zones;
 
         // Identity memo; the key is the complete set of inputs ui_fn() can observe
-        // (dpr because canvas.width = width * dpr, anchor: XQOEPuOg).
+        // (dpr because canvas.width = width * dpr).
         // No invalidation calls anywhere: staleness is checked here, at the point of use.
         let m = this.zones_memo;
         if (m !== null
