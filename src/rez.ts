@@ -420,12 +420,11 @@ export function pointer_event_to_canvas_coords(e: PointerEvent | WheelEvent, can
         assert(e.currentTarget instanceof HTMLCanvasElement);
         canvas = e.currentTarget;
     }
-    let rect = canvas.getBoundingClientRect();
-    let dpr = window.devicePixelRatio;
-    // this assumes canvas size is set according to dpr, anchor: XQOEPuOg
+
+    let cs = getComputedStyle(canvas);
     return {
-        x: e.offsetX * canvas.width / (rect.width * dpr),
-        y: e.offsetY * canvas.height / (rect.height * dpr),
+        x: e.offsetX - parseFloat(cs.paddingLeft),
+        y: e.offsetY - parseFloat(cs.paddingTop),
     };
 }
 
