@@ -110,6 +110,7 @@ function App() {
             paint: ({ hovered_zone }) => {
                 if (hovered_zone !== z) return;
                 ctx.strokeStyle = "black";
+                ctx.lineWidth = 1;
                 ctx.beginPath();
                 ctx.arc(x, y, r, 0, Math.PI * 2);
                 ctx.stroke();
