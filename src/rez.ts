@@ -305,7 +305,7 @@ export class Rez {
 
     private get_zones(): Zone[] {
         let measured = this.measured;
-        if (this.#canvas === null || measured === null || measured.width === 0) return no_zones;
+        if (this.#canvas === null || measured === null || measured.width === 0 || measured.height === 0) return no_zones;
 
         // Identity memo; the key is the complete set of inputs ui_fn() can observe
         // (dpr because canvas.width = width * dpr, anchor: XQOEPuOg).
@@ -353,7 +353,7 @@ export class Rez {
     private paint() {
         if (this.#canvas === null) return;
         let measured = this.measured;
-        if (measured === null || measured.width === 0) return;
+        if (measured === null || measured.width === 0 || measured.height === 0) return;
         if (!this.repaint_needed) return;
         this.repaint_needed = false;
 
