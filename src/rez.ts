@@ -246,7 +246,7 @@ export class Rez {
         }
 
         let mouse_pos = bang(this.mouse_pos);
-        call_handler(() => handler?.(mouse_pos));
+        handler?.(mouse_pos);
     }
 
     /**
@@ -283,11 +283,11 @@ export class Rez {
         let on_hover = this.hovered_zone?.on_hover;
         if (event !== null && on_hover !== undefined) {
             let { x, y } = bang(this.mouse_pos);
-            call_handler(() => on_hover({ x, y, event }));
+            on_hover({ x, y, event });
             this.hover_active = true;
         } else if (this.hover_active) {
             this.hover_active = false;
-            call_handler(() => this.on_unhover());
+            this.on_unhover();
         }
 
         if (this.#canvas !== null) {
@@ -323,7 +323,15 @@ export class Rez {
 
         if (this.log) console.time("ui_fn");
         this.ui_fn_count += 1;
-        let zones = this.#ui_fn({ canvas: this.#canvas, width: measured.width, height: measured.height });
+        assert(current_rez_for_paint_state === NONE);
+        current_rez_for_paint_state = DISALLOWED;
+        let zones;
+        try {
+            zones = this.#ui_fn({ canvas: this.#canvas, width: measured.width, height: measured.height });
+        } finally {
+            assert(current_rez_for_paint_state === DISALLOWED);
+            current_rez_for_paint_state = NONE;
+        }
         if (this.log) console.timeEnd("ui_fn");
         zones.sort((a, b) => a.priority - b.priority);
         this.zones_memo = { ui_fn: this.#ui_fn, canvas: this.#canvas, width: measured.width, height: measured.height, dpr: measured.dpr, zones };
@@ -365,7 +373,7 @@ export class Rez {
         }
         this.paint_states.clear();
 
-        assert(current_rez_for_paint_state === DISALLOWED);
+        assert(current_rez_for_paint_state === NONE);
         // Intentional: publish the currently-painting Rez as ambient context
         // for PaintState.get()/set(). Not the pre-ES6 `const self = this` pattern.
         // eslint-disable-next-line @typescript-eslint/no-this-alias
@@ -376,7 +384,7 @@ export class Rez {
             }
         } finally {
             assert(current_rez_for_paint_state === this);
-            current_rez_for_paint_state = DISALLOWED;
+            current_rez_for_paint_state = NONE;
         }
 
         this.paint_count += 1;
@@ -429,7 +437,7 @@ export class PaintState<T> {
     }
 
     get(): T {
-        assert(current_rez_for_paint_state !== DISALLOWED, "paint state can only be accessed in paint() or event handler");
+        assert(current_rez_for_paint_state !== DISALLOWED, "paint state must not be read in ui_fn()");
         if (current_rez_for_paint_state !== NONE) {
             let rez = current_rez_for_paint_state;
             if (this.subscribers.has(rez)) {
@@ -455,17 +463,7 @@ export class PaintState<T> {
 const NONE: unique symbol = Symbol('NONE');
 const DISALLOWED: unique symbol = Symbol('DISALLOWED');
 
-// Set to a specific Rez instance when painting,
-// to NONE in event handlers, and to DISALLOWED elsewhere (e.g. in ui_fn()).
-let current_rez_for_paint_state: Rez | typeof NONE | typeof DISALLOWED = DISALLOWED;
-
-function call_handler(f: () => void) {
-    assert(current_rez_for_paint_state === DISALLOWED);
-    current_rez_for_paint_state = NONE;
-    try {
-        f();
-    } finally {
-        assert(current_rez_for_paint_state === NONE);
-        current_rez_for_paint_state = DISALLOWED;
-    }
-}
+// Set to a specific Rez instance when painting (reads subscribe),
+// to DISALLOWED during ui_fn() (reads throw),
+// and to NONE everywhere else (reads are plain unsubscribed peeks).
+let current_rez_for_paint_state: Rez | typeof NONE | typeof DISALLOWED = NONE;
