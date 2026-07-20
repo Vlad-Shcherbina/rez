@@ -214,6 +214,12 @@ export class Rez {
             c.releasePointerCapture(e.pointerId);
             this.handle_pointer_event(e);
         }, { signal: this.unsubscribe.signal });
+
+        c.addEventListener("pointercancel", () => {
+            // This event should be uncommon on desktop with mouse,
+            // so for now it's a placeholder.
+            assert(false, "pointercancel not handled (TODO)");
+        }, { signal: this.unsubscribe.signal });
     }
 
     private handle_pointer_event(e: PointerEvent) {
