@@ -114,6 +114,7 @@ export class Rez {
         // Inputs measured against the old canvas are meaningless.
         this.mouse_event = null;
         this.measured = null;
+        this.zones_memo = null;
 
         this.unsubscribe.abort();
         this.unsubscribe = new AbortController();
