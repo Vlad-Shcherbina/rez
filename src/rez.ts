@@ -115,6 +115,7 @@ export class Rez {
         this.mouse_event = null;
         this.measured = null;
         this.zones_memo = null;
+        this.clear_paint_state_subscriptions();
 
         this.unsubscribe.abort();
         this.unsubscribe = new AbortController();
@@ -366,11 +367,7 @@ export class Rez {
         ctx.clearRect(0, 0, canvas.width, canvas.height);
         ctx.scale(measured.dpr, measured.dpr);
 
-        for (let ps of this.paint_states) {
-            let had = ps.subscribers.delete(this);
-            assert(had);
-        }
-        this.paint_states.clear();
+        this.clear_paint_state_subscriptions();
 
         assert(current_rez_for_paint_state === NONE);
         // Intentional: publish the currently-painting Rez as ambient context
@@ -388,6 +385,14 @@ export class Rez {
 
         this.paint_count += 1;
         if (this.log) console.timeEnd("rez.paint()");
+    }
+
+    private clear_paint_state_subscriptions() {
+        for (let ps of this.paint_states) {
+            let had = ps.subscribers.delete(this);
+            assert(had);
+        }
+        this.paint_states.clear();
     }
 }
 
