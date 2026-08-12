@@ -1,1 +1,3 @@
-minimumReleaseAge: 2880  # in minutes
+allowBuilds:
+  esbuild: false
+minimumReleaseAge: 2880 # in minutes
