@@ -18,7 +18,7 @@ it would have to opt out explicitly.
 - last raw mouse event (`null` while the mouse is not over the canvas)
 
 Paint states are a fifth input, but only `paint()` depends on them; they keep
-their own subscription mechanism (see [./007-paint-state.md]) and stay outside
+their own subscription mechanism (see [007-paint-state.md](./007-paint-state.md)) and stay outside
 this scheme.
 
 Setting the canvas resets `measured` to `null` (a stale size must not feed
@@ -38,7 +38,7 @@ is what settles hover and derived state in the meantime.
 - `zones = ui_fn({canvas, width, height})` — the only costly computation.
   Cached behind an identity memo whose key is the complete set of inputs
   `ui_fn` can observe: `(ui_fn, canvas, width, height, dpr)`. `dpr` is in the
-  key because `ui_fn` can read `canvas.width`, which is `width * dpr`
+  key because `ui_fn` can read `canvas.width`, which is `width * dpr`.
   There are no invalidation calls anywhere — staleness is
   checked at the point of use, so a new route for mutating an existing input
   cannot forget to invalidate. A genuinely new dependency requires extending
@@ -100,4 +100,4 @@ handler sees the same world the hover handlers saw.
   what the browser lets us observe.
 - Moving directly from a zone whose `on_hover` set a tooltip onto a zone
   whose `on_hover` does not clear it produces no falling edge — the known
-  inelegance of [./008-tooltips-and-unhover.md], unchanged.
+  inelegance of [008-tooltips-and-unhover.md](./008-tooltips-and-unhover.md), unchanged.

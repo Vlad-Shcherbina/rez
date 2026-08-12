@@ -1,4 +1,4 @@
-Provide special hook:
+Provide a special hook:
 ```js
 let [get_x, set_x] = usePaintState(() => 0);
 ```
@@ -29,4 +29,4 @@ painted pixels, self-healing on unrelated rerenders) is the expensive kind.
 Purpose - the committed/transient rule: state that changes zone structure
 (which zones exist, their sdfs and handlers) belongs in React state;
 state that only changes pixels belongs in paint state.
-Typical use: the live pointer position during a drag (see [./006-drag-hack.md]).
+Typical use: the live pointer position during a drag (see [006-drag-hack.md](./006-drag-hack.md)).

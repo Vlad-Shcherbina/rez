@@ -8,11 +8,11 @@ Basics:
 - **Hover effect** — restyle in `paint({ hovered })`, plus `cursor` on the zone. anchor: 31ImAttW
 - **Hover indicator in a separate zone** — when the effect needs a different priority
   (rings, shadows), a paint-only zone checks `hovered_zone`.
-  See [../ADRs/004-hover.md]. anchor: H8XbZthF
+  See [004-hover.md](../ADRs/004-hover.md). anchor: H8XbZthF
 - **Tooltips** — `set_tooltip()` in `on_hover`, `clear_tooltip()` in the global `on_unhover`.
-  See `useTooltip()` in `src/tooltip.tsx` and [../ADRs/008-tooltips-and-unhover.md].
+  See `useTooltip()` in `src/tooltip.tsx` and [008-tooltips-and-unhover.md](../ADRs/008-tooltips-and-unhover.md).
 - **Generous hit areas** — sdf larger than the painted shape; overlapping targets
-  split the hover area sensibly thanks to the SDF tie-break ([../ADRs/003-sdf.md]). anchor: tS4B9KXi
+  split the hover area sensibly thanks to the SDF tie-break ([003-sdf.md](../ADRs/003-sdf.md)). anchor: tS4B9KXi
 - **Catch-all zone** — `sdf: () => -1` makes a zone cover the whole canvas:
   background click actions, or suppressing interaction during a gesture. anchor: JYtu0kft
 
@@ -22,9 +22,9 @@ State:
   commit it with a render-time set_state. anchor: T02u6vSM
 - **Live readout via paint state** — one zone's `on_hover` writes a paint state,
   another zone's `paint` reads it: repaint with no rerender and no `ui_fn`.
-  See [../ADRs/007-paint-state.md]. anchor: spqEMBfi
+  See [007-paint-state.md](../ADRs/007-paint-state.md). anchor: spqEMBfi
 - **Drag to pan** — committed/transient state split, catch-all overlay,
-  global `ctx.translate` trick. See [../ADRs/006-drag-hack.md]. anchor: yFg3E1rq
+  global `ctx.translate` trick. See [006-drag-hack.md](../ADRs/006-drag-hack.md). anchor: yFg3E1rq
 - **Orthogonal hover aspects** — zones drive different subsets of hover state
   (tooltip, status bar, readouts); funnel every `on_hover` through one `apply_hover(partial)`
   that spreads the partial over defaults, so unmentioned aspects reset automatically. anchor: D76Qq7ZS

@@ -1,6 +1,6 @@
 # How to express dragging or panning in this system
 
-The gesture state is split in two (see [./007-paint-state.md]):
+The gesture state is split in two (see [007-paint-state.md](./007-paint-state.md)):
 
 - The drag origin lives in React state: its changes alter zone structure
   (the drag overlay appears, elements that shouldn't be interactive mid-drag disappear).
