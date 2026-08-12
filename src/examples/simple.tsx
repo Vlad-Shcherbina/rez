@@ -19,15 +19,17 @@ function App() {
     let [get_x, set_x] = usePaintState(() => 0);
 
     let ui_fn: UiFn = ({canvas, width, height}) => {
-        assert(canvas.width % 400 === 0, `${canvas.width} ${canvas.height}`); // % to allow for DPI factor
-        // TODO: doesn't work for fractional DPI such as 150%
+        // Trying to catch possible issues like incorrectly including border size and getting 402.
+        let expected_width = Math.round(400 * window.devicePixelRatio);
+        assert(canvas.width === expected_width, `${canvas.width} ${canvas.height} {expected_width}`);
 
+        // Alternating pattern is also to catch physical/logical resolution mismatches (they'll show as Moire).
         let zones: Zone[] = [];
         let ctx = bang(canvas.getContext("2d"));
         zones.push({
             priority: -1000,
             paint: ({ ui_fn_count, paint_count }) => {
-                assert(canvas.width % 400 === 0, `${canvas.width} ${canvas.height}`); // % to allow for DPI factor
+                assert(canvas.width === expected_width, `${canvas.width} ${canvas.height} {expected_width}`);
                 ctx.fillStyle = "black";
                 for (let i = 0; i < width; i += 2) {
                     ctx.fillRect(i, 0, 1, 1);
