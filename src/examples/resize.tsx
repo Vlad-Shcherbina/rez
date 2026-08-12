@@ -2,13 +2,11 @@ import "../offensive";
 import { bang } from "../assert";
 import { createRoot } from "react-dom/client";
 import { UiFn, Zone } from "../rez";
-import { StrictMode, useLayoutEffect, useRef } from "react";
+import { StrictMode, useRef } from "react";
 import { useRez } from "../rerez";
 
 function App() {
     let canvas_ref = useRef<HTMLCanvasElement>(null);
-    let rez = useRez(canvas_ref);
-    rez.log = true;
 
     let ui_fn: UiFn = ({ canvas, width, height }) => {
         console.log("ui_fn", width, height, canvas.width, canvas.height);
@@ -51,9 +49,9 @@ function App() {
         return zones;
     }
 
-    // Maybe pass ui_fn to useRez and move the effect there? (anchor: VhPJQYue)
-    useLayoutEffect(() => {
-        rez.ui_fn = ui_fn;
+    useRez(canvas_ref, {
+        ui_fn,
+        log: true,
     });
 
     return <>

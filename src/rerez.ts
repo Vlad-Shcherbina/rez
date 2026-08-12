@@ -1,18 +1,42 @@
 import { RefObject, useLayoutEffect, useRef } from "react";
-import { PaintState, Rez } from "./rez";
+import { bang } from "./assert";
+import { PaintState, Rez, UiFn } from "./rez";
 
-export function useRez(canvas_ref: RefObject<HTMLCanvasElement | null>) {
+type UseRezOptions = {
+    ui_fn: UiFn,
+    on_unhover?: () => void,
+    log?: boolean,
+};
+
+const noop = () => {};
+
+export function useRez(
+    canvas_ref: RefObject<HTMLCanvasElement | null>,
+    { ui_fn, on_unhover = noop, log = false }: UseRezOptions,
+) {
     let rez_ref = useRef<Rez>(null);
     rez_ref.current ??= new Rez();
-    let rez = rez_ref.current;
+
     useLayoutEffect(() => {
         // "destructor"
-        return () => { rez.canvas = null; }
-    }, [rez]);
+        return () => {
+            let rez = bang(rez_ref.current);
+
+            // canvas = null reconciles in a microtask. By then other hooks used by
+            // on_unhover may already have been cleaned up.
+            rez.on_unhover = noop;
+            rez.canvas = null;
+        }
+    }, []);
+
     useLayoutEffect(() => {
+        let rez = bang(rez_ref.current);
+
+        rez.log = log;
+        rez.ui_fn = ui_fn;
+        rez.on_unhover = on_unhover;
         rez.canvas = canvas_ref.current;
     });
-    return rez;
 }
 
 export function usePaintState<T>(f: () => T) {

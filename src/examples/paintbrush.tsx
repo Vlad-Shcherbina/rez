@@ -2,7 +2,7 @@ import "../offensive";
 import { bang } from "../assert";
 import { createRoot } from "react-dom/client";
 import { UiFn, Zone } from "../rez";
-import { StrictMode, useLayoutEffect, useRef, useState } from "react";
+import { StrictMode, useRef, useState } from "react";
 import { usePaintState, useRez } from "../rerez";
 
 /*
@@ -24,8 +24,6 @@ const CELL_SIZE = 10;
 
 function App() {
     let canvas_ref = useRef<HTMLCanvasElement>(null);
-    let rez = useRez(canvas_ref);
-    rez.log = true;
 
     let [get_xy, set_xy] = usePaintState<{ x: number, y: number } | null>(() => null);
     let [left_pressed, set_left_pressed] = useState(false);
@@ -92,9 +90,10 @@ function App() {
         return [zone];
     };
 
-    useLayoutEffect(() => {
-        rez.ui_fn = ui_fn;
-        rez.on_unhover = () => set_xy(null);
+    useRez(canvas_ref, {
+        ui_fn,
+        on_unhover: () => set_xy(null),
+        log: true,
     });
 
     return <>

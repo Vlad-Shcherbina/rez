@@ -37,8 +37,6 @@ const DEFAULT_HOVER: HoverState = {
 
 function App() {
     let canvas_ref = useRef<HTMLCanvasElement>(null);
-    let rez = useRez(canvas_ref);
-    rez.log = true;
 
     let { set_tooltip, clear_tooltip } = useTooltip();
 
@@ -109,9 +107,10 @@ function App() {
         return zones;
     };
 
-    useLayoutEffect(() => {
-        rez.ui_fn = ui_fn;
-        rez.on_unhover = () => apply_hover(null, {});
+    useRez(canvas_ref, {
+        ui_fn,
+        on_unhover: () => apply_hover(null, {}),
+        log: true,
     });
 
     useLayoutEffect(() => {

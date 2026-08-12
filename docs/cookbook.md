@@ -37,7 +37,8 @@ Misc:
 - **Wheel zoom** — fixed-point zoom about the cursor, d3-style sensitivity normalization
   (not rez-specific); listens on the canvas directly, bypassing rez. anchor: yFfLKf0l
 - **Repaint economy debugging** — paint `ui_fn_count`/`paint_count` in a corner and watch
-  them while interacting; `rez.log` prints timings. Every example's background zone does this.
+  them while interacting; every example's background zone does this.
+  `log: true` in `useRez()` prints timings.
 
 Gotcha:
 

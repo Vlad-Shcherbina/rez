@@ -4,13 +4,11 @@ import { createRoot } from "react-dom/client";
 import { UiFn, Zone } from "../rez";
 import { make_circle_sdf, make_segment_sdf } from "../sdfs";
 import { useTooltip } from "../tooltip";
-import { StrictMode, useLayoutEffect, useRef, useState } from "react";
+import { StrictMode, useRef, useState } from "react";
 import { usePaintState, useRez } from "../rerez";
 
 function App() {
     let canvas_ref = useRef<HTMLCanvasElement>(null);
-    let rez = useRez(canvas_ref);
-    rez.log = true;
 
     let [toggled, set_toggled] = useState([true, false, false]);
 
@@ -141,13 +139,13 @@ function App() {
         return zones;
     }
 
-    // Maybe pass ui_fn and on_hover to useRez and move the effect there? (anchor: VhPJQYue)
-    useLayoutEffect(() => {
-        rez.ui_fn = ui_fn;
-        rez.on_unhover = () => {
+    useRez(canvas_ref, {
+        ui_fn,
+        on_unhover: () => {
             set_x(-1); // anchor: spqEMBfi
             clear_tooltip();
-        }
+        },
+        log: true,
     });
 
     return <>

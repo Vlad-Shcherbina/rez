@@ -62,8 +62,6 @@ function wheel_zoom_factor(e: WheelEvent): number {
 
 function App() {
     let canvas_ref = useRef<HTMLCanvasElement>(null);
-    let rez = useRez(canvas_ref);
-    rez.log = true;
 
     let { set_tooltip, clear_tooltip } = useTooltip();
 
@@ -207,12 +205,12 @@ function App() {
         return zones;
     }
 
-    // Maybe pass ui_fn and on_hover to useRez and move the effect there? (anchor: VhPJQYue)
-    useLayoutEffect(() => {
-        rez.ui_fn = ui_fn;
-        rez.on_unhover = () => {
+    useRez(canvas_ref, {
+        ui_fn,
+        on_unhover: () => {
             clear_tooltip();
-        }
+        },
+        log: true,
     });
 
     // Wheel zoom is a pure canvas concern (no zones involved), so it doesn't go
