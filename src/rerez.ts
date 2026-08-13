@@ -20,12 +20,9 @@ export function useRez(
     useLayoutEffect(() => {
         // "destructor"
         return () => {
-            let rez = bang(rez_ref.current);
-
-            // canvas = null reconciles in a microtask. By then other hooks used by
-            // on_unhover may already have been cleaned up.
-            rez.on_unhover = noop;
-            rez.canvas = null;
+            // The release this triggers is deferred, so it lands after the unmount;
+            // on_unhover handlers tolerate that (anchor: qX3vNbW8).
+            bang(rez_ref.current).canvas = null;
         }
     }, []);
 

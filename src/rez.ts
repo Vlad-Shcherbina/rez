@@ -124,9 +124,15 @@ export class Rez {
         // when c === null, or when canvas has display:none or otherwise not rendered.
         // Deferred for the same reason as in the ui_fn setter (anchor: 76UVNDC4):
         // this setter also runs mid-React-commit, and this reconcile can fire
-        // on_unhover, releasing hover held against the old canvas. Deferring also
-        // means that falling edge reaches the on_unhover assigned in the same
-        // commit, not the stale one.
+        // on_unhover, releasing hover held against the old canvas. The invariant is
+        // that reconcile never dispatches app code from inside a commit: effects run
+        // in hook declaration order, so at this point the effects of hooks declared
+        // below useRez have not run, and whatever on_unhover needs from them is not
+        // built yet. Deferring to a microtask, which runs after the whole commit,
+        // buys order-independence: where the app declares useRez among its other
+        // hooks stops being load-bearing. On the teardown path this means the
+        // release lands after the unmount, so on_unhover must tolerate arriving
+        // late (anchor: qX3vNbW8).
         queueMicrotask(() => this.reconcile("frame"));
 
         if (c === null) { return; }

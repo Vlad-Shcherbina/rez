@@ -86,6 +86,14 @@ terminated by the app-side equality cutoffs. A microtask still runs before
 the initial ResizeObserver fire, so derived values are settled before the
 first paint.
 
+Teardown uses the same deferred path (`canvas = null` from the `useRez`
+cleanup), so the final `on_unhover` lands after the unmount, when the hooks it
+touches may be gone. Releasing it synchronously instead would reach a bit more
+of the app - destroys also run in hook declaration order, so only the hooks
+declared above `useRez` would be gone by then - but not enough to be worth a
+second dispatch path, since the hooks declared above are exactly where the
+tooltip sits. Handlers tolerate the late call instead (anchor: qX3vNbW8).
+
 Why pointer events reconcile synchronously: `on_left_mouse_down/up` must be
 dispatched to a `hovered_zone` computed from the very event being handled;
 consequence: `on_hover` fires before `on_left_mouse_down`, so the down
