@@ -21,12 +21,19 @@ export function useTooltip() {
         div_ref.current = el;
         let root = root_ref.current = createRoot(el);
 
-        // Without a microtask, <StrictMode> produces a warning:
-        // "Attempted to synchronously unmount a root while React was already rendering."
-        return () => queueMicrotask(() => {
-            root.unmount();
-            bang(el.parentNode).removeChild(el);
-        });
+        return () => {
+            // Synchronously, so that late calls see the teardown even though the
+            // unmount below is deferred. anchor: qX3vNbW8
+            div_ref.current = null;
+            root_ref.current = null;
+
+            // Without a microtask, <StrictMode> produces a warning:
+            // "Attempted to synchronously unmount a root while React was already rendering."
+            queueMicrotask(() => {
+                root.unmount();
+                bang(el.parentNode).removeChild(el);
+            });
+        };
     }, []);
 
     let set_tooltip = useCallback((content: ReactNode, e: MouseEvent) => {
@@ -52,8 +59,14 @@ export function useTooltip() {
     }, []);
 
     let clear_tooltip = useCallback(() => {
+        // Tolerate calls after unmount (anchor: qX3vNbW8): "no tooltip is shown"
+        // already holds, so there is nothing to do and nothing to report.
+        // set_tooltip() deliberately does not tolerate them - it cannot satisfy
+        // "a tooltip is visible", so such a call is a bug worth an exception.
+        let root = root_ref.current;
+        if (root === null) return;
+
         let div = bang(div_ref.current);
-        let root = bang(root_ref.current);
         div.style.display = "none";
         root.render(<></>);
     }, []);
