@@ -103,7 +103,7 @@ export class Rez {
         // next line), and would make the
         // ui_fn -> on_hover -> setState -> rerender -> ui_fn cycle recursive
         // instead of a flat microtask ping-pong.
-        queueMicrotask(() => this.reconcile("frame"));
+        queueMicrotask(() => this.reconcile());
     }
 
     get canvas() { return this.#canvas; }
@@ -133,7 +133,7 @@ export class Rez {
         // hooks stops being load-bearing. On the teardown path this means the
         // release lands after the unmount, so on_unhover must tolerate arriving
         // late (anchor: qX3vNbW8).
-        queueMicrotask(() => this.reconcile("frame"));
+        queueMicrotask(() => this.reconcile());
 
         if (c === null) { return; }
 
@@ -186,7 +186,7 @@ export class Rez {
                 // the resolution change cleared the canvas, and this callback runs in
                 // the frame's rendering steps (the same slot as rAF), before the frame
                 // is presented.
-                this.reconcile("now");
+                this.reconcile({ paint_timing: "now" });
             }
         });
 
@@ -200,7 +200,7 @@ export class Rez {
 
         c.addEventListener("pointerleave", () => {
             this.mouse_event = null;
-            this.reconcile("frame");
+            this.reconcile();
         }, { signal: this.unsubscribe.signal });
 
         c.addEventListener("pointermove", (e) => {
@@ -233,7 +233,7 @@ export class Rez {
         // Sync reconcile, so the dispatch below sees a hovered_zone computed from
         // this very event (the pointer may have moved since the last pointermove).
         // Consequence: on_hover fires before the mouse-button handler.
-        this.reconcile("frame");
+        this.reconcile();
 
         // pointerdown/pointerup only fire for the first press and final release.
         // Changes to chorded buttons arrive as pointermove with button identifying
@@ -260,10 +260,12 @@ export class Rez {
      * is followed by exactly one reconcile() call, which refreshes the derived values
      * and decides all reactions (handlers, cursor, repaint). See ADRs/009-reconcile.md.
      *
-     * "now" paints synchronously; only for the resize path, where the canvas was just
-     * cleared and we are already in the frame's rendering steps.
+     * paint_timing only picks when the repaint happens, never when this call does -
+     * reconcile always runs synchronously. It defaults to "frame" (rAF); "now" paints
+     * synchronously, and is only for the resize path, where the canvas was just cleared
+     * and we are already in the frame's rendering steps.
      */
-    private reconcile(paint_timing: "frame" | "now") {
+    private reconcile({ paint_timing = "frame" }: { paint_timing?: "frame" | "now" } = {}) {
         let prev_zones = this.zones;
         let prev_hovered_zone = this.hovered_zone;
 
